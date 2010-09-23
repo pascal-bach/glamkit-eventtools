@@ -109,6 +109,9 @@ def humanized_date_range(date1, date2, imply_year=True, space=" ", range_str="-"
     
     
 def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="midnight", noon="noon", range_str="-"):
+        
+        if time1 == time2 == None:
+            raise Exception("need to provide at least one time")
     
         apdict = {
             'am': am,
@@ -117,7 +120,7 @@ def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="m
             'noon': noon,
             '': '',
         }
-    
+            
         ##THIS IS NOT LOCALE-TOLERANT. Assumption of am/pm.
         if time1 is not None:
                 
@@ -132,12 +135,19 @@ def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="m
                     t1ap = "noon"
                 t1h = ""
         
+            #render the minutes only if necessary
+            if t1m != "00":
+                t1 = t1h+separator+t1m
+            else:
+                t1 = t1h
+        
             #Case: the two are equal; no range
             if (time1 == time2):
-                return "%s%s%s%s" % (t1h, separator, t1m, apdict[t1ap])
+                
+                return "%s%s" % (t1, apdict[t1ap])
             
             if time2 is None:
-                return "from %s%s%s%s" % (t1h, separator, t1m, apdict[t1ap])
+                return "from %s%s" % (t1, apdict[t1ap])
 
         t2h = str(int(time2.strftime("%I"))) #decimal (remove leading 0s)
         t2m = time2.strftime("%M") #leading 0s       
@@ -156,11 +166,8 @@ def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="m
     
         if time1 is not None:
             #get rid of redundancies
-            #render the minutes only if necessary
-            if t1m != "00":
-                t1 = t1h+separator+t1m
-            else:
-                t1 = t1h
+
+
             # and am/pm
             if t1ap == t2ap and time1 < time2:
                 t1ap = ""
@@ -168,19 +175,109 @@ def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="m
             return "%s%s%s%s%s" % (t1, apdict[t1ap], range_str, t2, apdict[t2ap])
         else:
             return "until %s%s" % (t2, apdict[t2ap])
-            
-def pprint_datetime_range(dt1, dt2, infer_all_day=False):
-    date1 = dt1.date()
-    time1 = dt1.time()
-    date2 = dt2.date()
-    time2 = dt2.time()
+ 
+def pprint_datetime_range(d1, t1, d2=None, t2=None,
+    infer_all_day=False, 
+    space=" ", 
+    date_range_str="-", 
+    time_range_str="-", 
+    separator=":", 
+    grand_range_str=" - ", 
+    am="am", 
+    pm="pm", 
+    noon="noon", 
+    midnight="midnight",
+):
+    datekwargs = {
+        'range_str': date_range_str,
+        'space': space,    
+    }
     
-    if time1 == time.min and time2 == time.max:
+    timekwargs = {
+        'range_str': time_range_str,
+        'separator': separator,
+        'am': am,
+        'pm': pm,
+        'noon': noon,
+        'midnight': midnight,
+    }
+    
+    if isinstance(d1, datetime):
+        dt1 = d1
+        dt2 = t1
+        #user has passed in datetimes instead
+        d1 = dt1.date()
+        t1 = dt1.time()
+            
+        if isinstance(dt2, datetime):
+            d2 = dt2.date()
+            t2 = dt2.time()
+        else:
+            d2 = None
+            t2 = None
+    
+    if t1 == time.min and t2 == time.max:
         if infer_all_day:
-            return "%s, all day", pprint_date_range(date1, date2)
-        return pprint_date_range(date1, date2)
+            return "all day on %s" % pprint_date_range(d1, d2, **datekwargs)
+        return pprint_date_range(d1, d2, **datekwargs)
+    
+    
+    if d1 == d2 and t1 and t2:
+        return "%(d)s, %(t)s" % {
+            'd': pprint_date_range(d1, d1, **datekwargs),
+            't': pprint_time_range(t1, t2, **timekwargs),
+        }
+
+    d1r = pprint_date_range(d1, d1, **datekwargs)
+    if d2 is not None:
+        d2r = pprint_date_range(d2, d2, **datekwargs)
     else:
-        return "%s, %s" % (pprint_date_range(date1, date2), pprint_time_range(time1, time2))
+        d2r = None
+    if t1 is not None:
+        t1r = pprint_time_range(t1, t1, **timekwargs)
+    else:
+        t1r = None
+    if t2 is not None:
+        t2r = pprint_time_range(t2, t2, **timekwargs)
+    else:
+        t2r = None
+
+    datadict = {
+        'd1': d1r,
+        't1': t1r,
+        'd2': d2r,
+        't2': t2r
+    }
+     
+
+    if d2 is not None:
+        if t1 is not None:
+            if t2 is not None:
+                formatstring = "%(d1)s, %(t1)s until %(t2)s on %(d2)s"
+            else:
+                formatstring = "%(d1)s, %(t1)s until %(d2)s"
+        else:
+            if t2 is not None:
+                formatstring = "%(d1)s until %(t2)s on %(d2)s"
+            else:
+                return pprint_date_range(d1, d2, **datekwargs) #*****
+
+    else:
+        if t1 is not None:
+            if t2 is not None:
+                return "%(d)s, %(t)s" % {
+                    'd': pprint_date_range(d1, d1, **datekwargs),
+                    't': pprint_time_range(t1, t2, **timekwargs), # *******
+                }
+            else:
+                formatstring = "%(d1)s, %(t1)s"
+        else:
+            if t2 is not None:
+                formatstring = "%(d1)s until %(t2)s"
+            else:
+                formatstring = "%(d1)s"
+
+    return formatstring % datadict
               
 if __name__ == "__main__":
 
@@ -191,16 +288,76 @@ if __name__ == "__main__":
             self.ae = self.assertEqual
 
         def test_normality(self):
-            dt1 = datetime(2010, 9, 23, 10, 42)
-            dt2 = datetime(2010, 9, 23, 16, 42)
-            self.ae(pprint_datetime_range(dt1, dt2), "23 September 2010, 10:42am-4:42pm")
+            d1 = date(2010, 9, 23)
+            d2 = date(2010, 9, 24)
+            t1 = time(12,42)
+            t2 = time(14,42)
+            dt1 = datetime.combine(d1, t1)
+            dt2 = datetime.combine(d2, t2)
+            
+            self.ae(pprint_datetime_range(d1, None), "23 September 2010")
+            self.ae(pprint_datetime_range(d1, t1), "23 September 2010, 12:42pm")
+            self.ae(pprint_datetime_range(d1, None, d2, None), "23-24 September 2010")
+            self.ae(pprint_datetime_range(d1, t1, None, t2), "23 September 2010, 12:42-2:42pm")
+            self.ae(pprint_datetime_range(d1, t1, d1, t2), "23 September 2010, 12:42-2:42pm")
+            self.ae(pprint_datetime_range(d1, t1, d2, t2), "23 September 2010, 12:42pm until 2:42pm on 24 September 2010")
+            
+            self.ae(pprint_datetime_range(d1, None, d2, t2), "23 September 2010 until 2:42pm on 24 September 2010")
+            self.ae(pprint_datetime_range(d1, None, None, t2), "23 September 2010 until 2:42pm")
+            self.ae(pprint_datetime_range(d1, t1, d2), "23 September 2010, 12:42pm until 24 September 2010")
+            
+            #datetimes
+            self.ae(pprint_datetime_range(dt1, None), pprint_datetime_range(d1, t1))
+            self.ae(pprint_datetime_range(dt1, dt2), pprint_datetime_range(d1, t1, d2, t2))
+
 
         def test_minmax(self):
             dt1 = datetime.combine(date(2010, 9, 23), time.min)
             dt2 = datetime.combine(date(2010, 9, 24), time.max)
             self.ae(pprint_datetime_range(dt1, dt2), "23-24 September 2010")
+            self.ae(pprint_datetime_range(dt1, dt2, infer_all_day=True), "all day on 23-24 September 2010")
 
 
+        def test_special(self):
+            d1 = date(2010, 9, 23)
+            d2 = date(2010, 9, 24)
+            t1 = time(00,00)
+            t2 = time(12,00)
+
+            self.ae(pprint_datetime_range(d1, None, d2, t2), "23 September 2010 until noon on 24 September 2010")
+            self.ae(pprint_datetime_range(d1, t1), "23 September 2010, midnight")
+            self.ae(pprint_datetime_range(d1, t1, None, t2), "23 September 2010, midnight-noon")
+            self.ae(pprint_datetime_range(d1, t1, d2), "23 September 2010, midnight until 24 September 2010")
+            self.ae(pprint_datetime_range(d1, t1, d2, t2), "23 September 2010, midnight until noon on 24 September 2010")
+
+        def test_formatting(self):
+              d1 = date(2010, 9, 23)
+              d2 = date(2010, 9, 24)
+              t1 = time(10,42)
+              t2 = time(14,42)
+              t3 = time(00,00)
+              t4 = time(12,00)
+         
+              kwargs = {
+                  'space': '.',
+                  'date_range_str': " to ",
+                  'time_range_str': "~",
+                  'separator': "/",
+                  'grand_range_str': " continuing to ",
+                  'am': 'a.m.',
+                  'pm': 'p.m.',
+                  'noon': 'nooooon',
+                  'midnight': 'the witching hour',
+              }
+              self.ae(pprint_datetime_range(d1, None, **kwargs), "23.September.2010")
+              self.ae(pprint_datetime_range(d1, None, d2, None, **kwargs), "23 to 24.September.2010")
+              self.ae(pprint_datetime_range(d1, None, d2, t2, **kwargs), "23.September.2010 until 2/42p.m. on 24.September.2010")
+              self.ae(pprint_datetime_range(d1, t1, **kwargs), "23.September.2010, 10/42a.m.")
+              self.ae(pprint_datetime_range(d1, t1, None, t2, **kwargs), "23.September.2010, 10/42a.m.~2/42p.m.")
+              self.ae(pprint_datetime_range(d1, t1, d2, **kwargs), "23.September.2010, 10/42a.m. until 24.September.2010")
+              self.ae(pprint_datetime_range(d1, t1, d2, t2, **kwargs), "23.September.2010, 10/42a.m. until 2/42p.m. on 24.September.2010")
+              self.ae(pprint_datetime_range(d1, t3, None, t4, **kwargs), "23.September.2010, the witching hour~nooooon")
+         
     class TestTimeRange(unittest.TestCase):
         def setUp(self):
             self.ae = self.assertEqual
@@ -238,6 +395,10 @@ if __name__ == "__main__":
             self.ae(pprint_time_range(time1, noon), "10am-noon")
             self.ae(pprint_time_range(midnight, time2), "midnight-11am")
             self.ae(pprint_time_range(time1, time3), "10-11:30am")
+            self.ae(pprint_time_range(midnight, None), "from midnight")
+            self.ae(pprint_time_range(None, midnight), "until midnight")
+            self.ae(pprint_time_range(midnight, midnight), "midnight")
+            self.ae(pprint_time_range(noon, None), "from noon")
            
 
 
