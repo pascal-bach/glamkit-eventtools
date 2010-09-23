@@ -32,3 +32,7 @@ class BroadcastEventVariation(EventVariationBase):
 class LessonEvent(EventBase):
     subject = models.TextField(max_length=100)
     #Test that an event can work without variations defined
+    
+class CampEvent(EventBase):
+    name = models.TextField(max_length=100)
+    tent_required = models.BooleanField()

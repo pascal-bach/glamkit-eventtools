@@ -1,16 +1,12 @@
 # −*− coding: UTF−8 −*−
 from dateutil import rrule
 from django.db.models.base import ModelBase
-from django.core.exceptions import ValidationError
 from eventtools.utils import OccurrenceReplacer
 import datetime
 from django.template.defaultfilters import date as date_filter
 from django.db import models
 from django.utils.translation import ugettext, ugettext_lazy as _
 from rules import Rule
-from utils import datetimeify
-import string
-
 
 """
 An OccurrenceGenerator defines the rules for generating a series of events. For example:
@@ -49,27 +45,45 @@ class OccurrenceGeneratorManager(models.Manager):
         TODO - make this a queryset function too!            
         """
         
-        start = datetimeify(start, "start")
-        end = datetimeify(end, 'end')    
+        if not isinstance(start, datetime.datetime):
+            start = datetime.datetime.combine(start, datetime.time.min)
+        
+        if not isinstance(end, datetime.datetime):
+            end = datetime.datetime.combine(end, datetime.time.max)
+        
         
         # relevant generators have
         # the first_start_date before the requested end date AND
         # the end date is NULL or after the requested start date
-        potential_occurrence_generators = self.filter(first_start_date__lte=end) & (self.filter(repeat_until__isnull=True) | self.filter(repeat_until__gte=start))
+        potental_occurrence_generators = self.filter(first_start_date__lte=end) & (self.filter(repeat_until__isnull=True) | self.filter(repeat_until__gte=start))
         
         occurrences = []
-        for generator in potential_occurrence_generators:
+        for generator in potental_occurrence_generators:
             occurrences += generator.get_occurrences(start, end)
         
         #In case you are pondering returning a queryset, remember that potentially occurrences are not in the database, so no such QS exists.
         
         return sorted(occurrences)
 
+
+
+class OccurrenceGeneratorModelBase(ModelBase):
+    """
+    When we create an OccurrenceGenerator, add to it an occurrence_model_name so it knows what to generate.
+    """
+    
+    def __init__(cls, name, bases, attrs):
+        if name != 'OccurrenceGeneratorBase': # This should only fire if this is a subclass
+            model_name = name[0:-len("Generator")].lower()
+            cls.add_to_class('_occurrence_model_name', model_name)
+        super(OccurrenceGeneratorModelBase, cls).__init__(name, bases, attrs)
+    
 class OccurrenceGeneratorBase(models.Model):
     """
     Defines a set of repetition rules for an event
     """
     
+    __metaclass__ = OccurrenceGeneratorModelBase
     objects = OccurrenceGeneratorManager()
     # Injected by EventModelBase:
     # event = models.ForeignKey(somekindofEvent)
@@ -80,72 +94,16 @@ class OccurrenceGeneratorBase(models.Model):
     first_start_date = models.DateField(_('start date of the first occurrence'))
     first_start_time = models.TimeField(_('start time of the first occurrence'))
     first_end_date = models.DateField(_('end date of the first occurrence'), null = True, blank = True, help_text=_("if you leave this blank, the same date as Start Date is assumed.")) 
-    first_end_time = models.TimeField(_('end time of the first occurrence'), null = True, blank = True, help_text=_("if you leave this blank, the same time as Start Time is assumed."))
+    first_end_time = models.TimeField(_('start time of the first occurrence'))
     rule = models.ForeignKey(Rule, verbose_name=_("repetition rule"), null = True, blank = True, help_text=_("Select '----' for a one-off event."))
     repeat_until = models.DateTimeField(null = True, blank = True, help_text=_("This date is ignored for one-off events."))
     
-    _date_description = models.CharField(_("Description of occurrences"), blank=True, max_length=255, help_text=_("e.g. \"Every Tuesday in March 2010\". If this is ommitted, an automatic description will be attempted."))
-    
-    def clean(self):
-        """ check that the end datetime must be after start date """
-        if self.first_start_date and self.first_start_time:
-	        first_start_datetime = datetime.datetime.combine(self.first_start_date, self.first_start_time)
-	
-	        # default to start_date and start_time for nullable first_end_* fields
-	        first_end_date = self.first_end_date or self.first_start_date
-	        first_end_time = self.first_end_time or self.first_start_time
-	        first_end_datetime = datetime.datetime.combine(first_end_date, first_end_time)
-	
-	        if first_end_datetime < first_start_datetime:
-	            raise ValidationError(_("end date (%s) must be greater than or equal to start date (%s).") % (first_end_datetime,
-	                                                                                              first_start_datetime))
-
-
-
     class Meta:
         ordering = ('first_start_date', 'first_start_time')
         abstract = True
         verbose_name = _('occurrence generator')
         verbose_name_plural = _('occurrence generators')
-        
-    def _start(self):
-        return datetime.datetime.combine(self.first_start_date, self.first_start_time)
-    start = property(_start)
-               
-    def date_description(self):
-        if self._date_description:
-            return self._date_description
-        return self.robot_description()
-    
-    def robot_description(self):
-        """
-        there is always:
-            - start date
-            - start time
-        "Monday, 1 January, 7pm"
-        sometimes:
-            - end date, if different from start date
-            "Monday, 1 January to Wednesday, 3 January, 7pm" 
-            - rule
-            As above, but starting with "Weekly from..."
-            - repeat until
-            As above but ending with "...until 5 January"
-        """
-        
-        result = "%s %s" % (datetime.datetime.strftime(self.first_start_date, "%A"), string.lstrip(datetime.datetime.strftime(self.first_start_date, "%d %B %Y"), '0'))
-        if self.first_end_date and (self.first_start_date != self.first_end_date):
-            result += " to %s" % datetime.datetime.strftime(self.first_end_date, "%A %d %B %Y")
 
-        result += ", %s" % datetime.time.strftime(self.first_start_time, "%I:%M%p").lstrip('0').replace(':00', '')
-        
-        if self.rule:
-            result = "%s from %s" % (self.rule, result)
-            
-        if self.repeat_until:
-            result += " until %s" % datetime.datetime.strftime(self.repeat_until, "%A %d %B %Y")
-        
-        return result
-        
     def _occurrence_model(self):
         return models.get_model(self._meta.app_label, self._occurrence_model_name)
     OccurrenceModel = property(_occurrence_model)
@@ -163,12 +121,6 @@ class OccurrenceGeneratorBase(models.Model):
         return occ
  
     def _end_recurring_period(self):
-        # if there's no repeat_until AND no rule, then just return your end date, or your start date
-        if not self.repeat_until and not self.rule:
-            if self.first_end_date:
-                return datetime.datetime.combine(self.first_end_date, self.first_end_time or self.first_start_time)
-            return datetime.datetime.combine(self.first_start_date, self.first_start_time)
-        
         return self.repeat_until
     end_recurring_period = property(_end_recurring_period)
 
@@ -231,11 +183,11 @@ class OccurrenceGeneratorBase(models.Model):
     def _set_end_time(self, value):
         self.first_end_time = value
     end_time = property(_get_end_time, _set_end_time)    
-       
+        
     def _end(self):
-        return datetime.datetime.combine(self.first_end_date or self.first_start_date, self.first_end_time or self.first_start_time)
+        return datetime.datetime.combine(self.first_end_date or self.first_start_date, self.first_end_time)
     end = property(_end)
-	
+
     def __unicode__(self):
         date_format = u'l, %s' % ugettext("DATE_FORMAT")
         result = ugettext('%(title)s: %(start)s-%(end)s') % {
@@ -247,16 +199,12 @@ class OccurrenceGeneratorBase(models.Model):
             result += " repeating %s until %s" % (self.rule, date_filter(self.repeat_until, date_format))
             
         return result
-	
-    def get_occurrences(self, start, end, hide_hidden=True):
+
+    def get_occurrences(self, start, end):
         """
         returns a list of occurrences between the datetimes ``start`` and ``end``.
         Includes all of the exceptional Occurrences.
         """
-        
-        start = datetimeify(start)
-        end = datetimeify(end)
-        
         exceptional_occurrences = self.occurrences.all()
         occ_replacer = OccurrenceReplacer(exceptional_occurrences)
         occurrences = self._get_occurrence_list(start, end)
@@ -265,51 +213,18 @@ class OccurrenceGeneratorBase(models.Model):
             # replace occurrences with their exceptional counterparts
             if occ_replacer.has_occurrence(occ):
                 p_occ = occ_replacer.get_occurrence(occ)
-                # ...but only if they're not hidden and you want to see them
-                if not (hide_hidden and p_occ.hide_from_lists):
-                    # ...but only if they are within this period
-                    if p_occ.start < end and p_occ.end >= start:
-                        final_occurrences.append(p_occ)
+                # ...but only if they are within this period
+                if p_occ.start < end and p_occ.end >= start:
+                    final_occurrences.append(p_occ)
             else:
               final_occurrences.append(occ)
         # then add exceptional occurrences which originated outside of this period but now
         # fall within it
         final_occurrences += occ_replacer.get_additional_occurrences(start, end)
-		
+
+        # import pdb; pdb.set_trace()
         return final_occurrences
-    
-    def get_changed_occurrences(self):
-        """
-        return ONLY a list of exceptional Occurrences.
-        """
         
-        exceptional_occurrences = self.occurrences.all()
-        changed_occurrences = []
-        
-        for occ in exceptional_occurrences:
-            if not occ.hide_from_lists:
-                # ...but only if they are within this period
-                changed_occurrences.append(occ)
-		
-        return changed_occurrences
-
-    def is_hidden(self):
-        """ return ``True`` if the generator has no repetition rule and the occurrence is hidden """
-        if self.rule is not None:
-            return False # if there is a repetition rule, this will always return False
-
-        exceptional_occurrences = self.occurrences.all()
-        return exceptional_occurrences[0].hide_from_lists if exceptional_occurrences else False
-
-
-    def is_cancelled(self):
-        """ return ``True`` if the generator has no repetition rule and the occurrence is cancelled """
-        if self.rule is not None:
-            return False # if there _is_ a repetition rule, this will always return False
-
-        exceptional_occurrences = self.occurrences.all()
-        return exceptional_occurrences[0].cancelled if exceptional_occurrences else False
-
 
     def get_rrule_object(self):
         if self.rule is not None:
@@ -381,15 +296,3 @@ class OccurrenceGeneratorBase(models.Model):
         while True:
             next = generator.next()
             yield occ_replacer.get_occurrence(next)
-            
-    def save(self):
-        # if the occurrence generator changes, we must not break the link with persisted occurrences
-        if self.id: # must already exist
-            for occ in self.occurrences.all(): # only persisted occurrences of course
-                occ.unvaried_start_date = self.first_start_date
-                occ.unvaried_start_time = self.first_start_time
-                occ.unvaried_end_date = self.first_end_date
-                occ.unvaried_end_time = self.first_end_time
-                occ.save()
-        super(OccurrenceGeneratorBase, self).save()
-
