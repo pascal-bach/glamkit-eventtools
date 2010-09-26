@@ -1,10 +1,10 @@
 from datetime import date, time
 from eventtools.utils import datetimeify, MIN, MAX
-from eventtools.pprint_datetime_range import pprint_datetime_range, pprint_time_range
+from eventtools.pprint_datetime_span import pprint_datetime_span, pprint_time_span
 from django.utils.timesince import timesince
 from django.utils.translation import ugettext, ugettext_lazy as _
 
-class SmartDateTimeRange(object):
+class SmartDateTimeSpan(object):
     def __init__(self, sd=None, st=None, ed=None, et=None, sdt=None, edt=None):
         """
         Does commonly-needed things with time ranges that may or may not include times.
@@ -38,19 +38,34 @@ class SmartDateTimeRange(object):
         self.start_date = self.sd = sd
         self.start_time = self.st = st
         self.end_date = self.ed = ed or sd
-        self.end_time = self.et = et
+        self.end_time = self.et = et or st
         
         if self.start_datetime > self.end_datetime:
             raise AttributeError("End time is before start time")
         
     def __unicode__(self):
         return self.robot_description()
+        
+    def __repr__(self):
+        return self.robot_description()
 
     def __cmp__(self, other):
-        return cmp(self.sd, other.sd) or \
-            cmp(self.st, other.st) or \
-            cmp(self.ed, other.ed) or \
-            cmp(self.et, other.et)
+        
+        #if the dates are different, return those
+        c1 = cmp(self.sd, other.sd)
+        if c1 != 0:
+            return c1
+        
+        if self.dates_only:
+            if other.dates_only:
+                return cmp(self.ed, other.ed)
+            else:
+                return -1 #put self first if other has times
+        else:
+            if other.dates_only:
+                return 1 #put other first if self has times
+            else:
+                return cmp(self.st, other.st) or cmp(self.et, other.et)
             
     def __eq__(self, other):
         return self.sd == other.sd and \
@@ -89,16 +104,16 @@ class SmartDateTimeRange(object):
             return self.end_datetime
     
     def robot_description(self):
-        return pprint_datetime_range(self.sd, self.st, self.ed, self.et)
+        return pprint_datetime_span(self.sd, self.st, self.ed, self.et)
 
     def robot_time_description(self):
-        return pprint_time_range(self.st, self.et)
+        return pprint_time_span(self.st, self.et)
 
     def robot_start_time_description(self):
-        return pprint_time_range(self.st, self.st)
+        return pprint_time_span(self.st, self.st)
 
     def robot_end_time_description(self):
-        return pprint_time_range(self.et, self.et)
+        return pprint_time_span(self.et, self.et)
 
     def start_description(self):
         if self.dates_only:

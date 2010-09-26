@@ -25,7 +25,7 @@ class OccurrenceReplacer(object):
     the generated ones that are equivalent.  This class makes this easier.
     """
     def __init__(self, exceptional_occurrences):
-        lookup = [((occ.generator.event, occ.original_start, occ.original_end), occ) for
+        lookup = [((occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end), occ) for
             occ in exceptional_occurrences]
         self.lookup = dict(lookup)
 
@@ -35,18 +35,19 @@ class OccurrenceReplacer(object):
         has already been matched
         """
         return self.lookup.pop(
-            (occ.generator.event, occ.original_start, occ.original_end),
+            (occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end),
             occ)
 
     def has_occurrence(self, occ):
-        return (occ.generator.event, occ.unvaried_timerange.start, occ.unvaried_timerange.end) in self.lookup
+        return (occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end) in self.lookup
 
     def get_additional_occurrences(self, start, end):
         """
         Return exceptional occurrences which are now in the period
         """
-        return [occ for key,occ in self.lookup.items() if (occ.start < end and occ.end >= start and not occ.cancelled)]
-
+        for key, occ in self.lookup.items():
+            if (occ.timespan.start < end and occ.timespan.start >= start and occ.timespan.end >= start and not occ.cancelled):
+                yield occ
 
 class check_event_permissions(object):
 

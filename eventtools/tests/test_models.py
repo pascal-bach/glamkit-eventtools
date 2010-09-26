@@ -235,7 +235,7 @@ class TestModel(TestCase):
         self.assertEqual(occ.unvaried_start_time, time(13,0))
         # deprecated
         # self.assertEqual(occ.start_time, time(13,0))
-        self.assertEqual(occ.timerange.start_time, time(13,0))
+        self.assertEqual(occ.timespan.start_time, time(13,0))
         self.assertEqual(occ.generator, gen)
         
         self.assertEqual(occ.id, None)
@@ -258,13 +258,13 @@ class TestModel(TestCase):
         
         self.assertEqual(occ.is_varied, True)
         self.assertEqual(occ.cancelled, False)
-        self.assertEqual(occ.timerange.start_time, time(14,0))        
+        self.assertEqual(occ.timespan.start_time, time(14,0))        
         #and let's check that re-querying returns the varied event
         
         occ = evt.get_one_occurrence()
         self.assertEqual(occ.is_varied, True)
         self.assertEqual(occ.cancelled, False)
-        self.assertEqual(occ.timerange.start_time, time(14,0))        
+        self.assertEqual(occ.timespan.start_time, time(14,0))        
         
     def test_cancellation(self):
         evt = BroadcastEvent.objects.create(presenter = "Jimmy McBigmouth", studio=2)

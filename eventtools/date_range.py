@@ -1,7 +1,7 @@
-from pprint_datetime_range import *
+from pprint_datetime_span import *
 
 import warnings
-warnings.warn("date_range is deprecated and will disappear soon. Use pprint_datetime_range", DeprecationWarning)
+warnings.warn("date_range is deprecated and will disappear soon. Use pprint_datetime_span", DeprecationWarning)
 
 def time_range(*args, **kwargs):
     if kwargs.has_key('separatorchar'):
@@ -13,7 +13,7 @@ def time_range(*args, **kwargs):
     if kwargs.has_key('spacechar'):
         kwargs['space'] = kwargs['spacechar']
         del kwargs['spacechar']
-    return pprint_time_range(*args, **kwargs)
+    return pprint_time_span(*args, **kwargs)
 
 def date_range(*args, **kwargs):
     if not kwargs.has_key('range_str'):
@@ -27,4 +27,4 @@ def date_range(*args, **kwargs):
     if kwargs.has_key('spacechar'):
         kwargs['space'] = kwargs['spacechar']
         del kwargs['spacechar']
-    return pprint_date_range(*args, **kwargs)
+    return pprint_date_span(*args, **kwargs)

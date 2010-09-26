@@ -37,7 +37,7 @@ def _clean_dates(date1, date2):
     return date1, date2
 
 
-def pprint_date_range(date1, date2, space=" ", range_str="-"):
+def pprint_date_span(date1, date2, space=" ", range_str="-"):
     
     date1, date2 = _clean_dates(date1, date2)
     
@@ -98,7 +98,7 @@ def humanized_date_range(date1, date2, imply_year=True, space=" ", range_str="-"
             else:    
                 ds = "%s%s%s%s%s%s%s" % (date1.strftime("%B"), space, date1.year, range_str, date2.strftime("%B"), space, date2.year)
     else:
-        ds = pprint_date_range(date1, date2, space, range_str)
+        ds = pprint_date_span(date1, date2, space, range_str)
         
     if imply_year:
         today = date.today()
@@ -108,7 +108,7 @@ def humanized_date_range(date1, date2, imply_year=True, space=" ", range_str="-"
     return ds
     
     
-def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="midnight", noon="noon", range_str="-"):
+def pprint_time_span(time1, time2, separator=":", am="am", pm="pm", midnight="midnight", noon="noon", range_str="-"):
         
         if time1 == time2 == None:
             raise Exception("need to provide at least one time")
@@ -176,8 +176,8 @@ def pprint_time_range(time1, time2, separator=":", am="am", pm="pm", midnight="m
         else:
             return "until %s%s" % (t2, apdict[t2ap])
  
-def pprint_datetime_range(d1, t1, d2=None, t2=None,
-    infer_all_day=False, 
+def pprint_datetime_span(d1, t1, d2=None, t2=None,
+    infer_all_day=True, 
     space=" ", 
     date_range_str="-", 
     time_range_str="-", 
@@ -218,27 +218,27 @@ def pprint_datetime_range(d1, t1, d2=None, t2=None,
     
     if t1 == time.min and t2 == time.max:
         if infer_all_day:
-            return "all day on %s" % pprint_date_range(d1, d2, **datekwargs)
-        return pprint_date_range(d1, d2, **datekwargs)
+            return "all day on %s" % pprint_date_span(d1, d2, **datekwargs)
+        return pprint_date_span(d1, d2, **datekwargs)
     
     
-    if d1 == d2 and t1 and t2:
+    if d1 == d2 and t1 is not None and t2 is not None:
         return "%(d)s, %(t)s" % {
-            'd': pprint_date_range(d1, d1, **datekwargs),
-            't': pprint_time_range(t1, t2, **timekwargs),
+            'd': pprint_date_span(d1, d1, **datekwargs),
+            't': pprint_time_span(t1, t2, **timekwargs),
         }
 
-    d1r = pprint_date_range(d1, d1, **datekwargs)
+    d1r = pprint_date_span(d1, d1, **datekwargs)
     if d2 is not None:
-        d2r = pprint_date_range(d2, d2, **datekwargs)
+        d2r = pprint_date_span(d2, d2, **datekwargs)
     else:
         d2r = None
     if t1 is not None:
-        t1r = pprint_time_range(t1, t1, **timekwargs)
+        t1r = pprint_time_span(t1, t1, **timekwargs)
     else:
         t1r = None
     if t2 is not None:
-        t2r = pprint_time_range(t2, t2, **timekwargs)
+        t2r = pprint_time_span(t2, t2, **timekwargs)
     else:
         t2r = None
 
@@ -260,14 +260,14 @@ def pprint_datetime_range(d1, t1, d2=None, t2=None,
             if t2 is not None:
                 formatstring = "%(d1)s until %(t2)s on %(d2)s"
             else:
-                return pprint_date_range(d1, d2, **datekwargs) #*****
+                return pprint_date_span(d1, d2, **datekwargs) #*****
 
     else:
         if t1 is not None:
             if t2 is not None:
                 return "%(d)s, %(t)s" % {
-                    'd': pprint_date_range(d1, d1, **datekwargs),
-                    't': pprint_time_range(t1, t2, **timekwargs), # *******
+                    'd': pprint_date_span(d1, d1, **datekwargs),
+                    't': pprint_time_span(t1, t2, **timekwargs), # *******
                 }
             else:
                 formatstring = "%(d1)s, %(t1)s"
@@ -295,27 +295,35 @@ if __name__ == "__main__":
             dt1 = datetime.combine(d1, t1)
             dt2 = datetime.combine(d2, t2)
             
-            self.ae(pprint_datetime_range(d1, None), "23 September 2010")
-            self.ae(pprint_datetime_range(d1, t1), "23 September 2010, 12:42pm")
-            self.ae(pprint_datetime_range(d1, None, d2, None), "23-24 September 2010")
-            self.ae(pprint_datetime_range(d1, t1, None, t2), "23 September 2010, 12:42-2:42pm")
-            self.ae(pprint_datetime_range(d1, t1, d1, t2), "23 September 2010, 12:42-2:42pm")
-            self.ae(pprint_datetime_range(d1, t1, d2, t2), "23 September 2010, 12:42pm until 2:42pm on 24 September 2010")
+            self.ae(pprint_datetime_span(d1, None), "23 September 2010")
+            self.ae(pprint_datetime_span(d1, t1), "23 September 2010, 12:42pm")
+            self.ae(pprint_datetime_span(d1, None, d2, None), "23-24 September 2010")
+            self.ae(pprint_datetime_span(d1, t1, None, t2), "23 September 2010, 12:42-2:42pm")
+            self.ae(pprint_datetime_span(d1, t1, d1, t2), "23 September 2010, 12:42-2:42pm")
+            self.ae(pprint_datetime_span(d1, t1, d2, t2), "23 September 2010, 12:42pm until 2:42pm on 24 September 2010")
             
-            self.ae(pprint_datetime_range(d1, None, d2, t2), "23 September 2010 until 2:42pm on 24 September 2010")
-            self.ae(pprint_datetime_range(d1, None, None, t2), "23 September 2010 until 2:42pm")
-            self.ae(pprint_datetime_range(d1, t1, d2), "23 September 2010, 12:42pm until 24 September 2010")
+            self.ae(pprint_datetime_span(d1, None, d2, t2), "23 September 2010 until 2:42pm on 24 September 2010")
+            self.ae(pprint_datetime_span(d1, None, None, t2), "23 September 2010 until 2:42pm")
+            self.ae(pprint_datetime_span(d1, t1, d2), "23 September 2010, 12:42pm until 24 September 2010")
             
             #datetimes
-            self.ae(pprint_datetime_range(dt1, None), pprint_datetime_range(d1, t1))
-            self.ae(pprint_datetime_range(dt1, dt2), pprint_datetime_range(d1, t1, d2, t2))
+            self.ae(pprint_datetime_span(dt1, None), pprint_datetime_span(d1, t1))
+            self.ae(pprint_datetime_span(dt1, dt2), pprint_datetime_span(d1, t1, d2, t2))
 
+        def test_identicality(self):
+            d1 = date(2010, 9, 23)
+            d2 = date(2010, 9, 23)
+            t1 = time(0,0)
+            t2 = time.max
+            self.ae(pprint_datetime_span(d1, t1, d2, t1), "23 September 2010, midnight")
+            self.ae(pprint_datetime_span(d1, None, d2, None), "23 September 2010")
+            self.ae(pprint_datetime_span(d1, t1, d2, t2), "all day on 23 September 2010")
 
         def test_minmax(self):
             dt1 = datetime.combine(date(2010, 9, 23), time.min)
             dt2 = datetime.combine(date(2010, 9, 24), time.max)
-            self.ae(pprint_datetime_range(dt1, dt2), "23-24 September 2010")
-            self.ae(pprint_datetime_range(dt1, dt2, infer_all_day=True), "all day on 23-24 September 2010")
+            self.ae(pprint_datetime_span(dt1, dt2, infer_all_day=False), "23-24 September 2010")
+            self.ae(pprint_datetime_span(dt1, dt2, infer_all_day=True), "all day on 23-24 September 2010")
 
 
         def test_special(self):
@@ -324,11 +332,11 @@ if __name__ == "__main__":
             t1 = time(00,00)
             t2 = time(12,00)
 
-            self.ae(pprint_datetime_range(d1, None, d2, t2), "23 September 2010 until noon on 24 September 2010")
-            self.ae(pprint_datetime_range(d1, t1), "23 September 2010, midnight")
-            self.ae(pprint_datetime_range(d1, t1, None, t2), "23 September 2010, midnight-noon")
-            self.ae(pprint_datetime_range(d1, t1, d2), "23 September 2010, midnight until 24 September 2010")
-            self.ae(pprint_datetime_range(d1, t1, d2, t2), "23 September 2010, midnight until noon on 24 September 2010")
+            self.ae(pprint_datetime_span(d1, None, d2, t2), "23 September 2010 until noon on 24 September 2010")
+            self.ae(pprint_datetime_span(d1, t1), "23 September 2010, midnight")
+            self.ae(pprint_datetime_span(d1, t1, None, t2), "23 September 2010, midnight-noon")
+            self.ae(pprint_datetime_span(d1, t1, d2), "23 September 2010, midnight until 24 September 2010")
+            self.ae(pprint_datetime_span(d1, t1, d2, t2), "23 September 2010, midnight until noon on 24 September 2010")
 
         def test_formatting(self):
               d1 = date(2010, 9, 23)
@@ -349,14 +357,14 @@ if __name__ == "__main__":
                   'noon': 'nooooon',
                   'midnight': 'the witching hour',
               }
-              self.ae(pprint_datetime_range(d1, None, **kwargs), "23.September.2010")
-              self.ae(pprint_datetime_range(d1, None, d2, None, **kwargs), "23 to 24.September.2010")
-              self.ae(pprint_datetime_range(d1, None, d2, t2, **kwargs), "23.September.2010 until 2/42p.m. on 24.September.2010")
-              self.ae(pprint_datetime_range(d1, t1, **kwargs), "23.September.2010, 10/42a.m.")
-              self.ae(pprint_datetime_range(d1, t1, None, t2, **kwargs), "23.September.2010, 10/42a.m.~2/42p.m.")
-              self.ae(pprint_datetime_range(d1, t1, d2, **kwargs), "23.September.2010, 10/42a.m. until 24.September.2010")
-              self.ae(pprint_datetime_range(d1, t1, d2, t2, **kwargs), "23.September.2010, 10/42a.m. until 2/42p.m. on 24.September.2010")
-              self.ae(pprint_datetime_range(d1, t3, None, t4, **kwargs), "23.September.2010, the witching hour~nooooon")
+              self.ae(pprint_datetime_span(d1, None, **kwargs), "23.September.2010")
+              self.ae(pprint_datetime_span(d1, None, d2, None, **kwargs), "23 to 24.September.2010")
+              self.ae(pprint_datetime_span(d1, None, d2, t2, **kwargs), "23.September.2010 until 2/42p.m. on 24.September.2010")
+              self.ae(pprint_datetime_span(d1, t1, **kwargs), "23.September.2010, 10/42a.m.")
+              self.ae(pprint_datetime_span(d1, t1, None, t2, **kwargs), "23.September.2010, 10/42a.m.~2/42p.m.")
+              self.ae(pprint_datetime_span(d1, t1, d2, **kwargs), "23.September.2010, 10/42a.m. until 24.September.2010")
+              self.ae(pprint_datetime_span(d1, t1, d2, t2, **kwargs), "23.September.2010, 10/42a.m. until 2/42p.m. on 24.September.2010")
+              self.ae(pprint_datetime_span(d1, t3, None, t4, **kwargs), "23.September.2010, the witching hour~nooooon")
          
     class TestTimeRange(unittest.TestCase):
         def setUp(self):
@@ -365,25 +373,25 @@ if __name__ == "__main__":
         def test_normality(self):
             time1 = time(10,20)
             time2 = time(10,40)
-            self.ae(pprint_time_range(time1, time2), "10:20-10:40am")
-            self.ae(pprint_time_range(time1, time1), "10:20am")
-            self.ae(pprint_time_range(time1, None), "from 10:20am")
-            self.ae(pprint_time_range(None, time2), "until 10:40am")
+            self.ae(pprint_time_span(time1, time2), "10:20-10:40am")
+            self.ae(pprint_time_span(time1, time1), "10:20am")
+            self.ae(pprint_time_span(time1, None), "from 10:20am")
+            self.ae(pprint_time_span(None, time2), "until 10:40am")
             # might just want to display this.
-            self.ae(pprint_time_range(time2, time1), "10:40am-10:20am")
+            self.ae(pprint_time_span(time2, time1), "10:40am-10:20am")
 
         def test_formatting(self):
             time1 = time(10,20)
             time2 = time(14,40)
-            self.ae(pprint_time_range(time1, time2, separator=".", range_str=" to ", am=" a.m.", pm=" p.m."), "10.20 a.m. to 2.40 p.m.")
+            self.ae(pprint_time_span(time1, time2, separator=".", range_str=" to ", am=" a.m.", pm=" p.m."), "10.20 a.m. to 2.40 p.m.")
             time1 = time(00,00)
             time2 = time(12,00)
-            self.ae(pprint_time_range(time1, time2,  range_str=" a ", midnight="midnuit", noon="midi"), "midnuit a midi")
+            self.ae(pprint_time_span(time1, time2,  range_str=" a ", midnight="midnuit", noon="midi"), "midnuit a midi")
 
         def test_overflow(self):
             time1 = time(10,50)
             time2 = time(14,40)
-            self.ae(pprint_time_range(time1, time2), "10:50am-2:40pm")
+            self.ae(pprint_time_span(time1, time2), "10:50am-2:40pm")
 
         def test_simplify(self):
             time1 = time(10,00)
@@ -391,14 +399,14 @@ if __name__ == "__main__":
             time3 = time(11,30)
             midnight = time(00,00)
             noon = time(12,00)
-            self.ae(pprint_time_range(time1, time2), "10-11am")
-            self.ae(pprint_time_range(time1, noon), "10am-noon")
-            self.ae(pprint_time_range(midnight, time2), "midnight-11am")
-            self.ae(pprint_time_range(time1, time3), "10-11:30am")
-            self.ae(pprint_time_range(midnight, None), "from midnight")
-            self.ae(pprint_time_range(None, midnight), "until midnight")
-            self.ae(pprint_time_range(midnight, midnight), "midnight")
-            self.ae(pprint_time_range(noon, None), "from noon")
+            self.ae(pprint_time_span(time1, time2), "10-11am")
+            self.ae(pprint_time_span(time1, noon), "10am-noon")
+            self.ae(pprint_time_span(midnight, time2), "midnight-11am")
+            self.ae(pprint_time_span(time1, time3), "10-11:30am")
+            self.ae(pprint_time_span(midnight, None), "from midnight")
+            self.ae(pprint_time_span(None, midnight), "until midnight")
+            self.ae(pprint_time_span(midnight, midnight), "midnight")
+            self.ae(pprint_time_span(noon, None), "from noon")
            
 
 
@@ -410,24 +418,24 @@ if __name__ == "__main__":
         def test_normality(self):
             date1 = date(2001, 10, 10)
             date2 = date(2001, 10, 12)
-            self.ae(pprint_date_range(date1, date2), "10-12 October 2001")
+            self.ae(pprint_date_span(date1, date2), "10-12 October 2001")
 
             date1 = date(2001, 10, 10)
             date2 = date(2001, 10, 10)
-            self.ae(pprint_date_range(date1, date2), "10 October 2001")
+            self.ae(pprint_date_span(date1, date2), "10 October 2001")
 
         def test_formatting(self):
             date1 = date(2001, 10, 10)
             date2 = date(2002, 10, 12)
-            self.ae(pprint_date_range(date1, date2, range_str=" to ", space="."), "10.October.2001 to 12.October.2002")
+            self.ae(pprint_date_span(date1, date2, range_str=" to ", space="."), "10.October.2001 to 12.October.2002")
             
         def test_invalid(self):
             date1 = date(2001, 10, 10)
             date2 = date(2001, 11, 12)
-            self.ae(pprint_date_range(date1, None), "10 October 2001")
-            self.assertRaises(TypeError, pprint_date_range, None, date2)
+            self.ae(pprint_date_span(date1, None), "10 October 2001")
+            self.assertRaises(TypeError, pprint_date_span, None, date2)
             #what if the dates are not in order
-            self.ae(pprint_date_range(date2, date1), "10 October-12 November 2001")
+            self.ae(pprint_date_span(date2, date1), "10 October-12 November 2001")
             
             # same with humanize
             self.ae(humanized_date_range(date1, None), "10 October 2001")
@@ -438,11 +446,11 @@ if __name__ == "__main__":
         def test_overflow(self):
             date1 = date(2001, 10, 10)
             date2 = date(2001, 11, 12)
-            self.ae(pprint_date_range(date1, date2), "10 October-12 November 2001")
+            self.ae(pprint_date_span(date1, date2), "10 October-12 November 2001")
 
             date1 = date(2001, 10, 10)
             date2 = date(2002, 10, 12)
-            self.ae(pprint_date_range(date1, date2), "10 October 2001-12 October 2002")
+            self.ae(pprint_date_span(date1, date2), "10 October 2001-12 October 2002")
             
         def test_humanize_date(self):
             # Check days are omitted if the range exactly covers the month.

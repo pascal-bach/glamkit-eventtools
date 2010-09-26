@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext, ugettext_lazy as _
 from mergedobject import MergedObject
 from vobject import iCalendar
-from eventtools.smartdatetimerange import SmartDateTimeRange
+from eventtools.smartdatetimespan import SmartDateTimeSpan
 from eventtools.deprecated import deprecated
 
 
@@ -50,21 +50,21 @@ class OccurrenceBase(models.Model):
 
     def __init__(self, *args, **kwargs):
 
-        uvtr = kwargs.get('unvaried_timerange', None)
+        uvtr = kwargs.get('unvaried_timespan', None)
         if uvtr:
             kwargs['unvaried_start_date'] = uvtr.sd
             kwargs['unvaried_start_time'] = uvtr.st
             kwargs['unvaried_end_date'] = uvtr.ed
             kwargs['unvaried_end_time'] = uvtr.et
-            del kwargs['unvaried_timerange']
+            del kwargs['unvaried_timespan']
  
-        vtr = kwargs.get('varied_timerange', None)
+        vtr = kwargs.get('varied_timespan', None)
         if vtr:
             kwargs['varied_start_date'] = vtr.sd
             kwargs['varied_start_time'] = vtr.st
             kwargs['varied_end_date'] = vtr.ed
             kwargs['varied_end_time'] = vtr.et
-            del kwargs['varied_timerange']           
+            del kwargs['varied_timespan']           
         
         # by default, create items with varied values the same as unvaried
         for uv_key, v_key in [
@@ -84,19 +84,19 @@ class OccurrenceBase(models.Model):
     def clean(self):
         """ check that the end datetime must be after start date, and that end time is not supplied without a start time. """
         try:
-            self.timerange
-            self.unvaried_timerange
+            self.timespan
+            self.unvaried_timespan
         except AttributeError as e:
             raise ValidationError(e)
 
     @property
-    def timerange(self):
-        return SmartDateTimeRange(self.varied_start_date, self.varied_start_time, self.varied_end_date, self.varied_end_time)
-    varied_timerange = timerange
+    def timespan(self):
+        return SmartDateTimeSpan(self.varied_start_date, self.varied_start_time, self.varied_end_date, self.varied_end_time)
+    varied_timespan = timespan
 
     @property
-    def unvaried_timerange(self):
-        return SmartDateTimeRange(self.unvaried_start_date, self.unvaried_start_time, self.unvaried_end_date, self.unvaried_end_time)
+    def unvaried_timespan(self):
+        return SmartDateTimeSpan(self.unvaried_start_date, self.unvaried_start_time, self.unvaried_end_date, self.unvaried_end_time)
         
     def _get_varied_event(self):
         try:
@@ -115,11 +115,13 @@ class OccurrenceBase(models.Model):
     unvaried_event = property(_get_unvaried_event)
                
     def _merged_event(self): #bit slow, but friendly
-        return MergedObject(self.unvaried_event, self.varied_event)
+        if self.varied_event:
+            return MergedObject(self.unvaried_event, self.varied_event)
+        return self.unvaried_event
     event = merged_event = property(_merged_event)
     
     def _is_moved(self):
-        return self.unvaried_timerange != self.varied_timerange
+        return self.unvaried_timespan != self.varied_timespan
     is_moved = property(_is_moved)
     
     def _is_varied(self):
@@ -138,18 +140,18 @@ class OccurrenceBase(models.Model):
 
     def __unicode__(self):
         return ugettext("%(event)s: %(day)s") % {
-            'event': self.event.title,
-            'day': unicode(self.timerange),
+            'event': self.event,
+            'day': unicode(self.timespan),
         }
 
     def __cmp__(self, other): #used for sorting occurrences.
-        return cmp(self.timerange, other.timerange)
+        return cmp(self.timespan, other.timespan)
 
     def __eq__(self, other):
         if isinstance(other, OccurrenceBase):
             return self.event == other.event and \
-                self.timerange == other.timerange and \
-                self.unvaried_timerange == other.unvaried_timerange
+                self.timespan == other.timespan and \
+                self.unvaried_timespan == other.unvaried_timespan
         return super(OccurrenceBase, self).__eq__(other)
 
     @property
@@ -177,25 +179,25 @@ class OccurrenceBase(models.Model):
 
         messages = []
         
-        if self.timerange.start_date != self.unvaried_timerange.start_date:
+        if self.timespan.start_date != self.unvaried_timespan.start_date:
             messages.append("new date")
 
         dd = None
-        if self.timerange.start_time < self.unvaried_timerange.start_time:
+        if self.timespan.start_time < self.unvaried_timespan.start_time:
             dd = "starts earlier at %s"
-        elif self.timerange.start_time > self.unvaried_timerange.start_time:
+        elif self.timespan.start_time > self.unvaried_timespan.start_time:
             dd = "starts later at %s"
 
         if dd:
-            messages.append(dd % self.timerange.robot_time_description())
+            messages.append(dd % self.timespan.robot_time_description())
         else:        
-            if self.timerange.end_time < self.unvaried_timerange.end_time:
+            if self.timespan.end_time < self.unvaried_timespan.end_time:
                 dd = "ends earlier at %s"
-            elif self.timerange.end_time > self.unvaried_timerange.end_time:
+            elif self.timespan.end_time > self.unvaried_timespan.end_time:
                 dd = "ends later at %s"
                 
                 if dd:
-                    messages.append(dd % self.timerange.robot_end_time_description())
+                    messages.append(dd % self.timespan.robot_end_time_description())
         
         return "; ".join(messages)
         
@@ -204,7 +206,7 @@ class OccurrenceBase(models.Model):
         """
         this occurrence is unique for an EVENT (the un/varied event) and for a particular DAY (start) and a particular place in a list
         """
-        start_date = self.timerange.start_date
+        start_date = self.timespan.start_date
         occurrence_list = self.generator.event.get_occurrences(start_date, start_date + datetime.timedelta(1))
         return occurrence_list.index(self)
 
@@ -231,13 +233,13 @@ class OccurrenceBase(models.Model):
         """
         ical = iCalendar()
         cal.add('method').value = 'PUBLISH'  # IE/Outlook needs this
-        ical.add('vevent').add('summary').value = self.merged_event.title
-        if self.timerange.dates_only:            
-            ical.vevent.add('dtstart').value = self.timerange.start_date
-            ical.vevent.add('dtend').value = self.timerange.end_date
+        ical.add('vevent').add('summary').value = self.merged_event.title #assumption. Think this should be method on Event
+        if self.timespan.dates_only:            
+            ical.vevent.add('dtstart').value = self.timespan.start_date
+            ical.vevent.add('dtend').value = self.timespan.end_date
         else:
-            ical.vevent.add('dtstart').value = self.timerange.start_datetime
-            ical.vevent.add('dtend').value = self.timerange.end_datetime
+            ical.vevent.add('dtstart').value = self.timespan.start_datetime
+            ical.vevent.add('dtend').value = self.timespan.end_datetime
         if self.cancelled:
             ical.vevent.add('method').value = 'CANCEL'
             ical.vevent.add('status').value = 'CANCELLED'
@@ -267,64 +269,64 @@ class OccurrenceBase(models.Model):
     @property
     @deprecated
     def varied_range_string(self):
-        return self.timerange.robot_description()
+        return self.timespan.robot_description()
 
     @property
     @deprecated
     def date_description(self):
-        return self.timerange.start_description()
+        return self.timespan.start_description()
 
     @property
     @deprecated
     def unvaried_range_string(self):
-        return self.unvaried_timerange.robot_description()
+        return self.unvaried_timespan.robot_description()
 
     @property
     @deprecated
     def start(self):
-         return self.timerange.start
+         return self.timespan.start
 
     @property
     @deprecated
     def end(self):
-        return self.timerange.end
+        return self.timespan.end
 
     @property
     @deprecated
     def original_start(self):
-         return self.unvaried_timerange.start
+         return self.unvaried_timespan.start
 
     @property
     @deprecated
     def original_end(self):
-        return self.unvaried_timerange.end
+        return self.unvaried_timespan.end
 
     @property
     @deprecated
     def start_time(self):
-        return self.timerange.start_time
+        return self.timespan.start_time
          
     @property
     @deprecated
     def end_time(self):
-        return self.timerange.end_time
+        return self.timespan.end_time
 
     @property
     @deprecated
     def start_date(self):
-        return self.timerange.start_date
+        return self.timespan.start_date
          
     @property
     @deprecated
     def end_date(self):
-        return self.timerange.end_date
+        return self.timespan.end_date
          
     @property
     @deprecated
     def duration(self):
-        return self.timerange.duration()
+        return self.timespan.duration()
          
     @property
     @deprecated
     def humanized_duration(self):
-        return self.timerange.humanized_duration()
+        return self.timespan.humanized_duration()

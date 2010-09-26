@@ -7,6 +7,7 @@ import sys
 from occurrencegenerators import *
 from occurrences import *
 from utils import occurrences_to_events
+from eventtools.deprecated import deprecated
 
 from django.core.exceptions import ValidationError
 
@@ -27,60 +28,46 @@ Since OccurrenceGenerators can generate a potentially infinite number of occurre
 
 To get an Event's occurrences between two dates:
 
-Event.get_occurrences(start_date, end_date).
+Event.occurrences_between(start_datetime, end_datetime).
 
 This will return a list of EventOccurrences. Remember to use EventOccurrence.merged_event to display the details for each event (since merged_event takes in to account variations).
 
 """
 
 class EventQuerySetBase(models.query.QuerySet):
-    def occurrences_between(self, start, end=None):        
+    def occurrences_between(self, start, end, hide_hidden=True):        
         """
-        returns the EventOccurrences in a given datetime range.
-        In most calendar applications you want to use occurrences_between_days.
+        returns the EventOccurrences in a given date(datetime) range.
         """
         occurrences = []
         for item in self:
-            occurrences += item.generators.occurrences_between(start, end)
+            occurrences += item.occurrences_between(start, end, hide_hidden)
             
         return sorted(occurrences)
 
-    def between(self, start, end):
+    def between(self, start, end, hide_hidden=True):
         """
         returns the Events (not occurrences) that occur in a given datetime range
-        In most calendar applications you want to use between_days.
         """
         occurrences = self.occurrences_between(start, end)
         return occurrences_to_events(occurrences)
-        
-    def occurrences_between_days(self, startday, endday):
-        """
-        returns the EventOccurrences in a given date range.
-        If datetimes are supplied, they are clamped to the beginning and end of their respective days.
-        """
-        if isinstance(startday, datetime.datetime):
-            startday = startday.date()
-        if isinstance(endday, datetime.datetime):
-            endday = endday.date()
-        return self.occurrences_between(
-            datetime.datetime.combine(startday, datetime.time.min),
-            datetime.datetime.combine(endday, datetime.time.max)
-        ) 
 
-    def between_days(self, startday, endday):
-        """
-        returns the Events (not occurrences) that occur in a given date range.
-        If datetimes are supplied, they are clamped to the beginning and end of their respective days.
-        """
-        occurrences = self.occurrences_between_days(startday, endday)
-        return occurrences_to_events(occurrences)
+    @deprecated
+    def occurrences_between_days(self, startday, endday, hide_hidden=True):
+        return self.occurrences_between(startday, endday, hide_hidden)
 
-    def occurrences_on_day(self, day):
+    @deprecated
+    def between_days(self, startday, endday, hide_hidden=True):
+        return self.between(self, startday, endday, hide_hidden)
+
+    @deprecated
+    def occurrences_on_day(self, day, hide_hidden=True):
         "Shortcut method"
-        return self.occurrences_between_days(day, day) 
+        return self.occurrences_between_days(day, day, hide_hidden) 
 
-    def on_day(self, day):
-        occurrences = self.occurrences_on_day(day)
+    @deprecated
+    def on_day(self, day, hide_hidden=True):
+        occurrences = self.occurrences_on_day(day, hide_hidden)
         return occurrences_to_events(occurrences)
 
 
@@ -93,16 +80,20 @@ class EventManagerBase(models.Manager):
         
     def between(self, start, end):
          return self.get_query_set().between(start, end)
-         
+    
+    @deprecated     
     def occurrences_between_days(self, startday, endday):
          return self.get_query_set().occurrences_between_days(startday, endday)
 
+    @deprecated
     def between_days(self, startday, endday):
          return self.get_query_set().between_days(startday, endday)
-
+         
+    @deprecated
     def occurrences_on_day(self, day):
         return self.get_query_set().on_day(day)
 
+    @deprecated
     def on_day(self, day):
         return self.get_query_set().on_day(day)
 
@@ -175,6 +166,15 @@ class EventBase(models.Model):
     class Meta:
         abstract = True
 
+    def clean(self):
+        """
+        validation:
+        if there are variations, throw a validation error.
+        (otherwise, the normal date_description function is used).
+        """
+        if self.variations_count() > 0 and not self.date_description:
+            raise ValidationError("Sorry, we can't figure out how to describe an event with variations. Please add your own date description under Visitor Info.")
+
     def date_description(self, hide_hidden=True):
         if self._date_description:
             return self._date_description
@@ -205,15 +205,6 @@ class EventBase(models.Model):
         return self.generators.count() > 1 or (self.generators.count() > 0 and self.generators.all()[0].rule != None)
     has_multiple_occurrences = property(_has_multiple_occurrences)
     
-    def clean(self):
-        """
-        validation:
-        if there are variations, throw a validation error.
-        (otherwise, the normal date_description function is used).
-        """
-        if self.variations_count() > 0 and not self.date_description:
-            raise ValidationError("Sorry, we can't figure out how to describe an event with variations. Please add your own date description under Visitor Info.")
-
     def get_first_generator(self):
         return self.generators.order_by('first_start_date', 'first_start_time')[0]
     first_generator = property(get_first_generator)
@@ -225,19 +216,20 @@ class EventBase(models.Model):
             raise IndexError("This Event type has no generators defined")
     get_one_occurrence = get_first_occurrence # for backwards compatibility
     
-    def get_occurrences(self, start, end, hide_hidden=True):
-        occs = []
-        for gen in self.generators.all():
-            occs += gen.get_occurrences(start, end, hide_hidden)
-        return sorted(occs)
+    @deprecated
+    def get_occurrences(self, start, end, hide_hidden):
+        return self.occurrences_between(start, end, hide_hidden)
+        
+    def occurrences_between(self, start, end, hide_hidden=True):
+        return self.generators.occurrences_between(start, end, hide_hidden)
         
     def get_all_occurrences_if_possible(self):
         if self.get_last_day():
-            return self.get_occurrences(self.first_generator.start, self.get_last_day())
+            return self.occurrences_between(self.first_generator.start, self.get_last_day())
     
     def occurrences_count(self):
         if self.get_last_day():
-            return len(self.get_occurrences(self.first_generator.start, self.get_last_day()))
+            return len(self.occurrences_between(self.first_generator.start, self.get_last_day()))
         else:
             return '&infin;'
     occurrences_count.allow_tags = True
@@ -324,7 +316,7 @@ class EventBase(models.Model):
         kwargs['unvaried_event'] = self
         return self.variations.create(*args, **kwargs)
         
-    def next_occurrences(self, num_days=28):
+    def next_occurrences(self, num_days=28): #why is this necessary? deprecate in favour of occurrences between day, day+timedelta(28)?
         from eventtools.periods import Period
         first = False
         last = False

@@ -3,14 +3,14 @@ from dateutil import rrule
 from django.db.models.base import ModelBase
 from django.core.exceptions import ValidationError
 from eventtools.utils import OccurrenceReplacer, datetimeify
-from eventtools.smartdatetimerange import SmartDateTimeRange
+from eventtools.smartdatetimespan import SmartDateTimeSpan
 import datetime
 from django.template.defaultfilters import date as date_filter
 from django.db import models
 from django.utils.translation import ugettext, ugettext_lazy as _
 from rules import Rule
 import string
-from eventtools.pprint_date_range import pprint_date_range
+from eventtools.pprint_datetime_span import pprint_date_span
 from eventtools.deprecated import deprecated
 
 
@@ -38,7 +38,7 @@ See occurrences.py for details.
 
 class OccurrenceGeneratorManager(models.Manager):
     
-    def occurrences_between(self, start, end):
+    def occurrences_between(self, start, end, hide_hidden=True):
         """
         Returns all Occurrences with a start_date/time between two datetimes, sorted.
         
@@ -61,7 +61,7 @@ class OccurrenceGeneratorManager(models.Manager):
         
         occurrences = []
         for generator in potential_occurrence_generators:
-            occurrences += generator.get_occurrences(start, end)
+            occurrences += generator.get_occurrences(start, end, hide_hidden)
         
         #In case you are pondering returning a queryset, remember that potentially occurrences are not in the database, so no such QS exists.
         
@@ -99,7 +99,7 @@ class OccurrenceGeneratorBase(models.Model):
     def clean(self):
         """ check that the end datetime must be after start date, and that end time is not supplied without a start time. """
         try:
-            self.timerange
+            self.timespan
         except AttributeError as e:
             raise ValidationError(e)            
 
@@ -118,8 +118,8 @@ class OccurrenceGeneratorBase(models.Model):
     
     
     @property
-    def timerange(self):
-        return SmartDateTimeRange(self.first_start_date, self.first_start_time, self.first_end_date, self.first_end_time)
+    def timespan(self):
+        return SmartDateTimeSpan(self.first_start_date, self.first_start_time, self.first_end_date, self.first_end_time)
     
     def date_description(self):
         return self._date_description or self.robot_description()
@@ -128,24 +128,24 @@ class OccurrenceGeneratorBase(models.Model):
         if self.rule:
             if self.repeat_until:
                 return "%s repeating %s until %s" % (
-                    self.timerange.robot_description(),
+                    self.timespan.robot_description(),
                     self.rule,
-                    pprint_date_range(self.repeat_until, self.repeat_until)
+                    pprint_date_span(self.repeat_until, self.repeat_until)
                 )
             else:
                 return "%s repeating %s" % (
-                    self.timerange.robot_description(),
+                    self.timespan.robot_description(),
                     self.rule,
                 )
         else:
-            return self.timerange.robot_description()
+            return self.timespan.robot_description()
         
     def _occurrence_model(self):
         return models.get_model(self._meta.app_label, self._occurrence_model_name)
     OccurrenceModel = property(_occurrence_model)
 
-    def _create_occurrence(self, unvaried_timerange, varied_timerange=None):
-        occ = self.OccurrenceModel(generator=self, unvaried_timerange=unvaried_timerange, varied_timerange=varied_timerange )
+    def _create_occurrence(self, unvaried_timespan, varied_timespan=None):
+        occ = self.OccurrenceModel(generator=self, unvaried_timespan=unvaried_timespan, varied_timespan=varied_timespan )
         return occ
     
     #check
@@ -154,7 +154,7 @@ class OccurrenceGeneratorBase(models.Model):
         generates a list of *unexceptional* Occurrences for this event between two datetimes, start and end.
         """
         
-        event_duration = self.timerange.duration() #a timedelta
+        event_duration = self.timespan.duration() #a timedelta
         if self.rule is not None:
             occurrences = []
             if self.repeat_until and self.repeat_until < end:
@@ -163,14 +163,18 @@ class OccurrenceGeneratorBase(models.Model):
             o_starts = rule.between(start, end, inc=True) #event_duration was subtracted from start!?!
             for o_start in o_starts:
                 o_end = o_start + event_duration
-                yield self._create_occurrence(unvaried_timerange = SmartDateTimeRange(sdt=o_start, edt=o_end))
-        else:
-            # check if event is in the period
-            if self.timerange.start_datetime < end and self.timerange.end_datetime >= start:
-                if self.timerange.dates_only:
-                    yield self._create_occurrence(unvaried_timerange = SmartDateTimeRange(sd=self.timerange.start_date))                    
+                if self.timespan.dates_only:
+                    
+                    yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sd=o_start.date(), ed=o_end.date()))
                 else:
-                    yield self._create_occurrence(unvaried_timerange = SmartDateTimeRange(sdt=self.timerange.start))
+                    yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=o_start, edt=o_end))
+        else:
+            # singleton event. check if event is in the period
+            if self.timespan.start_datetime >= start and self.timespan.start_datetime < end and self.timespan.end_datetime >= start:
+                if self.timespan.dates_only:
+                    yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sd=self.timespan.start_date, ed=self.timespan.end_date))                    
+                else:
+                    yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=self.timespan.start, edt=self.timespan.end))
             else:
                 return
     
@@ -186,17 +190,17 @@ class OccurrenceGeneratorBase(models.Model):
         rule = self.get_rrule_object()
         if rule is None:
             if self.end > after:
-                yield self._create_occurrence(unvaried_timerange = self.timerange)
-            raise StopIteration
+                yield self._create_occurrence(unvaried_timespan = self.timespan)
+            return
         date_iter = iter(rule)
-        event_duration = self.timerange.duration()
+        event_duration = self.timespan.duration()
         while True:
             o_start = date_iter.next()
             if o_start > self.repeat_until:
                 raise StopIteration
             o_end = o_start + event_duration
             if o_end > after:
-                yield self._create_occurrence(unvaried_timerange = SmartDateTimeRange(sdt=o_start, edt=o_end))
+                yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=o_start, edt=o_end))
     
     #check
     def get_occurrences(self, start, end, hide_hidden=True):
@@ -211,7 +215,6 @@ class OccurrenceGeneratorBase(models.Model):
         exceptional_occurrences = self.occurrences.all()
         occ_replacer = OccurrenceReplacer(exceptional_occurrences)
         occurrences = self._get_occurrence_list(start, end)
-        final_occurrences = []
         for occ in occurrences:
             # replace occurrences with their exceptional counterparts
             if occ_replacer.has_occurrence(occ):
@@ -219,16 +222,15 @@ class OccurrenceGeneratorBase(models.Model):
                 # ...but only if they're not hidden and you want to see them
                 if not (hide_hidden and p_occ.hide_from_lists):
                     # ...but only if they are within this period
-                    if p_occ.start < end and p_occ.end >= start:
-                        final_occurrences.append(p_occ)
+                    if p_occ.timespan.start >= start and p_occ.timespan.start < end and p_occ.timespan.end >= start:
+                        yield p_occ
             else:
-              final_occurrences.append(occ)
+              yield occ
         # then add exceptional occurrences which originated outside of this period but now
         # fall within it
-        final_occurrences += occ_replacer.get_additional_occurrences(start, end)
-        
-        return final_occurrences
-    
+        additional = occ_replacer.get_additional_occurrences(start, end)
+        yield additional.next()
+            
     def get_exceptional_occurrences(self, exclude_hidden=True):
         """
         return ONLY a queryset of exceptional Occurrences.
@@ -264,12 +266,12 @@ class OccurrenceGeneratorBase(models.Model):
         if self.rule is not None:
             if self.rule.complex_rule:
                 try:
-                    return rrule.rrulestr(str(self.rule.complex_rule),dtstart=self.timerange.start)
+                    return rrule.rrulestr(str(self.rule.complex_rule),dtstart=self.timespan.start)
                 except:
                     pass
             params = self.rule.get_params()
             frequency = 'rrule.%s' % self.rule.frequency
-            simple_rule = rrule.rrule(eval(frequency), dtstart=self.timerange.start, **params)
+            simple_rule = rrule.rrule(eval(frequency), dtstart=self.timespan.start, **params)
             rs = rrule.rruleset()
             rs.rrule(simple_rule)
             return rs
@@ -303,12 +305,12 @@ class OccurrenceGeneratorBase(models.Model):
     @property
     @deprecated
     def start(self):
-        return self.timerange.start
+        return self.timespan.start
 
     @property
     @deprecated
     def end(self):
-        return self.timerange.end
+        return self.timespan.end
 
 
     @property
@@ -334,7 +336,7 @@ class OccurrenceGeneratorBase(models.Model):
             try:
                 return self.OccurrenceModel.objects.get(generator__event = self, unvaried_start_date = date)
             except self.OccurrenceModel.DoesNotExist:
-                return self._create_occurrence(unvaried_timerange = SmartDateTimeRange(sdt=next_occurrence))
+                return self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=next_occurrence))
     
     @deprecated
     def get_changed_occurrences(self):

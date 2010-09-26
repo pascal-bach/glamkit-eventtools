@@ -39,7 +39,7 @@ class TestPeriod(TestCase):
 
     def test_get_occurrences(self):
         occurrence_list = self.period.occurrences
-        self.assertEqual(["%s to %s" %(o.timerange.start, o.timerange.end) for o in occurrence_list],
+        self.assertEqual(["%s to %s" %(o.timespan.start, o.timespan.end) for o in occurrence_list],
             ['2008-01-05 08:00:00 to 2008-01-05 09:00:00',
              '2008-01-12 08:00:00 to 2008-01-12 09:00:00',
              '2008-01-19 08:00:00 to 2008-01-19 09:00:00'])
@@ -48,8 +48,8 @@ class TestPeriod(TestCase):
         occurrence_dicts = self.period.get_occurrence_partials()
         self.assertEqual(
             [(occ_dict["class"],
-            occ_dict["occurrence"].timerange.start,
-            occ_dict["occurrence"].timerange.end)
+            occ_dict["occurrence"].timespan.start,
+            occ_dict["occurrence"].timespan.end)
             for occ_dict in occurrence_dicts],
             [
                 (1,

@@ -36,3 +36,6 @@ class LessonEvent(EventBase):
 class CampEvent(EventBase):
     name = models.TextField(max_length=100)
     tent_required = models.BooleanField()
+    
+    def __unicode__(self):
+        return self.name

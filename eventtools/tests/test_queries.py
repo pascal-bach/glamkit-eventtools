@@ -237,6 +237,9 @@ class TestQueries(TestCase):
         """
         Test that if an event spans several days we can run queries on an interior range that
         excludes that event (should be making several 1-day events)
+
+        Test that date-only eventss can be saved, and when occurrences are queried, just return dates
+
         """
 
         summercamp = CampEvent.objects.create(name = "Beach Camp!!", tent_required=True)
@@ -244,20 +247,163 @@ class TestQueries(TestCase):
         start_date = date(2010, 11, 24) #it's a friday
         end_date = date(2010, 11, 27) #it's a monday
 
+        before_date = start_date - timedelta(1)
+        after_date = end_date + timedelta(1)
+        
+        inside_date_1 = start_date + timedelta(1) 
+        inside_date_2 = end_date - timedelta(1) 
+
         summercamp.create_generator(
             first_start_date=start_date,
             first_end_date=end_date
         )
         
-        summercamp.generators.occurrences_between(start_date, end_date)
+        for occs in [
+            summercamp.occurrences_between(start_date, end_date),
+            summercamp.occurrences_between(start_date, start_date),
+            summercamp.occurrences_between(before_date, after_date),
+            summercamp.occurrences_between(before_date, start_date),
+            summercamp.occurrences_between(before_date, inside_date_1),
+            summercamp.occurrences_between(start_date, inside_date_1),
+        ]:
+            self.assertEqual(len(occs), 1)
+
+        for occs in [
+            summercamp.occurrences_between(inside_date_1, end_date),
+            summercamp.occurrences_between(inside_date_1, inside_date_2),
+            summercamp.occurrences_between(inside_date_2, after_date),
+        ]:
+            self.assertEqual(len(occs), 0)
+
+
+        this_week = summercamp.occurrences_between(start_date, start_date)
+        self.assertEqual(len(this_week), 1)
+        self.assertEqual(this_week[0].timespan.duration(), timedelta(3))
+        self.assertEqual(this_week[0].timespan.start_date, start_date)
+        self.assertEqual(this_week[0].timespan.end_date, end_date)
+        self.assertEqual(this_week[0].timespan.start_time, None)
+        self.assertEqual(this_week[0].timespan.end_time, None)
+
         
-    def test_date_only_events(self):
-        pass
+    def test_multiday_repetition(self):
+        """
+        Test that repeated multidates can be saved, and when occurrences are queried, just return dates
+        """
+        
+        summercamp = CampEvent.objects.create(name = "Beach Camp!!", tent_required=True)        
+        start_date = date(2010, 11, 24) #it's a friday
+        end_date = date(2010, 11, 27) #it's a monday
+        weekly = Rule.objects.create(name="weekly", frequency="WEEKLY")
+        summercamp.create_generator(
+            first_start_date=start_date,
+            first_end_date=end_date,
+            rule=weekly,        
+        )
+         
+        this_week = summercamp.occurrences_between(start_date, start_date)
+        
+        self.assertEqual(len(this_week), 1)
+        self.assertEqual(this_week[0].timespan.duration(), timedelta(3))
+        self.assertEqual(this_week[0].timespan.start_date, start_date)
+        self.assertEqual(this_week[0].timespan.end_date, end_date)
+        self.assertEqual(this_week[0].timespan.start_time, None)
+        self.assertEqual(this_week[0].timespan.end_time, None)
+        
+        next_week = summercamp.occurrences_between(start_date+timedelta(7), start_date+timedelta(7))
+        self.assertEqual(len(next_week), 1)
+        self.assertEqual(next_week[0].timespan.duration(), timedelta(3))
+        self.assertEqual(next_week[0].timespan.start_date, start_date+timedelta(7))
+        self.assertEqual(next_week[0].timespan.end_date, end_date+timedelta(7))
+        self.assertEqual(next_week[0].timespan.start_time, None)
+        self.assertEqual(next_week[0].timespan.end_time, None)
+        
+    def test_date_only_queries(self):
         """
         Test that:
-        * can be saved
-        * generated occurrences also use dates only, have date_only == True
-        * saved occurrences can have time set (e.g. from unknown -> known)
+        * can be saved, and when queried, just return dates
+        * can be varied to other things that are just dates
+        * generated occurrences also use dates only, have dates_only == True
         * in lists, date_only events appear first
-        * in lists, occurrences with time set appear in the right order
+        * in lists, occurrences with times appear after those without
+        * saved occurrences can have time added later (e.g. from unknown -> known)
         """
+        busy_day = date(2010, 11, 24)
+    
+        weekly = Rule.objects.create(name="weekly", frequency="WEEKLY")
+        weeklycamp = CampEvent.objects.create(name = "Weekly Camp!!", tent_required=False)        
+        weeklycamp.create_generator(
+            first_start_date=busy_day,
+            rule=weekly,
+        )
+        # get from db
+        weeklycamp = CampEvent.objects.get(id=weeklycamp.id)
+        
+        occs = weeklycamp.occurrences_between(busy_day, busy_day+timedelta(1))
+        self.assertEqual(len(occs), 1)
+        occ = occs[0]
+        self.assertEqual(occ.timespan.dates_only, True)
+        self.assertEqual(occ.timespan.start, busy_day)
+        self.assertEqual(occ.timespan.start_date, busy_day)
+        self.assertEqual(occ.timespan.end_date, busy_day)
+        self.assertEqual(occ.timespan.start_time, None)
+        self.assertEqual(occ.timespan.end_time, None)
+        self.assertEqual(occ.timespan.start_datetime, datetime.combine(busy_day, time.min))
+        self.assertEqual(occ.timespan.end_datetime, datetime.combine(busy_day, time.max))
+        
+        
+        hourly = Rule.objects.create(name="hourly", frequency="HOURLY")
+        hourlytour = CampEvent.objects.create(name = "Not really a camp!!", tent_required=False)
+        hourlytour.create_generator(
+            first_start_date=busy_day,
+            first_start_time=time(10,00),
+            rule=hourly,
+        )
+        
+        occs = CampEvent.objects.occurrences_between(busy_day, busy_day)
+        
+        self.assertEqual(len(occs), 15) # every hour from 10am to 11pm, plus the Weekly event.
+        self.assertEqual(occs[0].timespan.start_date, busy_day)
+        self.assertEqual(occs[0].timespan.end_date, busy_day)
+        self.assertEqual(occs[0].timespan.start_time, None)
+        self.assertEqual(occs[0].timespan.end_time, None)
+        self.assertEqual(occs[0].event, weeklycamp) # events without a time come first
+
+        self.assertEqual(occs[1].timespan.start_date, busy_day)
+        self.assertEqual(occs[1].timespan.end_date, busy_day)
+        self.assertEqual(occs[1].timespan.start_time, time(10,00))
+        self.assertEqual(occs[1].timespan.end_time, time(10,00)) #if end time is omitted, use start time
+        self.assertEqual(occs[1].event, hourlytour) # events without a time come first
+        
+        #let's say we know the time for next't week's camp
+        
+        next_week = busy_day + timedelta(7)
+        nwcamp = weeklycamp.occurrences_between(next_week, next_week)[0]
+        
+        nwcamp.varied_start_time = time(10,30)
+        nwcamp.save()
+        
+        camps = weeklycamp.occurrences_between(busy_day, next_week)
+        
+        self.assertEqual(unicode(camps[0].timespan), "24 November 2010")
+        self.assertEqual(unicode(camps[1].timespan), "1 December 2010, 10:30am")
+            
+    def test_weird_cases(self):        
+        """
+        so what happens when you want an event with no time to repeat hourly??
+        It doesn't really matter since it's such an edge case, but it turns out 24 Occurrences are generated, each with no time!
+        """
+        
+        strange_day = date(2010, 11, 24)
+        hourly = Rule.objects.create(name="hourly", frequency="HOURLY")
+        hourlycamp = CampEvent.objects.create(name = "Hourly Camp!!", tent_required=False)
+        hourlycamp.create_generator(
+            first_start_date=strange_day,
+            rule=hourly,
+        )
+        
+        occs = hourlycamp.occurrences_between(strange_day, strange_day)
+        
+        self.assertEqual(len(occs), 24)
+        self.assertEqual(occs[0], occs[23])
+        
+            
