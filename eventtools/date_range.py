@@ -1,7 +1,7 @@
-from pprint_date_range import *
+from pprint_datetime_range import *
 
 import warnings
-warnings.warn("date_range is deprecated and will disappear soon. Use pprint_date_range", DeprecationWarning)
+warnings.warn("date_range is deprecated and will disappear soon. Use pprint_datetime_range", DeprecationWarning)
 
 def time_range(*args, **kwargs):
     if kwargs.has_key('separatorchar'):
