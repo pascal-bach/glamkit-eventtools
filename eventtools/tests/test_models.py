@@ -171,6 +171,14 @@ class TestModel(TestCase):
                 first_end_time=str(time(13, 0))))
         self.assertTrue(form.is_valid())
 
+        # same as above, except first_end_date not specified
+        form = LectureEventOccurrenceGeneratorForm(dict(
+                event=evt.pk,
+                first_start_date=str(date(2010, 8, 1))
+            ))
+        self.assertTrue(form.is_valid())
+
+
         # first_end_date not specified
         form = LectureEventOccurrenceGeneratorForm(dict(
                 event=evt.pk,
@@ -200,7 +208,7 @@ class TestModel(TestCase):
         self.assert_(occ.clean() is None)
 
         occ.varied_end_date = occ.varied_start_date + timedelta(-1)
-        self.assertTrue(occ.is_varied)
+        self.assertRaises(AttributeError, getattr, occ, 'is_varied')
         self.assertRaises(ValidationError, occ.clean)
 
     
@@ -208,7 +216,7 @@ class TestModel(TestCase):
         evt = BroadcastEvent.objects.create(presenter = "Jimmy McBigmouth", studio=2)
         gen = evt.create_generator(first_start_date=date(2010, 1, 1), first_start_time=time(13, 0), first_end_date=None, first_end_time=time(14, 0))
         
-        #This didn't always work. Testing prevents regeressions!
+        #This didn't always work. Testing prevents regressions!
         self.assertTrue(evt)
         self.assertTrue(gen)
         self.assertEqual(evt.generators.count(), 1)
@@ -225,7 +233,9 @@ class TestModel(TestCase):
     
         self.assertEqual(occ.varied_start_time, time(13,0))
         self.assertEqual(occ.unvaried_start_time, time(13,0))
-        self.assertEqual(occ.start_time, time(13,0))
+        # deprecated
+        # self.assertEqual(occ.start_time, time(13,0))
+        self.assertEqual(occ.timerange.start_time, time(13,0))
         self.assertEqual(occ.generator, gen)
         
         self.assertEqual(occ.id, None)
@@ -248,13 +258,13 @@ class TestModel(TestCase):
         
         self.assertEqual(occ.is_varied, True)
         self.assertEqual(occ.cancelled, False)
-        self.assertEqual(occ.start_time, time(14,0))        
+        self.assertEqual(occ.timerange.start_time, time(14,0))        
         #and let's check that re-querying returns the varied event
         
         occ = evt.get_one_occurrence()
         self.assertEqual(occ.is_varied, True)
         self.assertEqual(occ.cancelled, False)
-        self.assertEqual(occ.start_time, time(14,0))        
+        self.assertEqual(occ.timerange.start_time, time(14,0))        
         
     def test_cancellation(self):
         evt = BroadcastEvent.objects.create(presenter = "Jimmy McBigmouth", studio=2)

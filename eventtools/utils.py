@@ -1,52 +1,21 @@
-import datetime
-import heapq
+from datetime import datetime, time
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpResponseRedirect
 from django.conf import settings
 from eventtools.conf.settings import CHECK_PERMISSION_FUNC
 
-class EventListManager(object):
-    """
-    This class is responsible for doing functions on a list of events. It is
-    used to when one has a list of events and wants to access the occurrences
-    from these events in as a group
-    """
-    def __init__(self, events):
-        self.events = events
+MIN = "start"
+MAX = "end"
 
-    # Not used - needs fixing to work with monkeypatched occurence models.
-    # def occurrences_after(self, after=None):
-    #      """
-    #      It is often useful to know what the next occurrence is given a list of
-    #      events.  This function produces a generator that yields the
-    #      the most recent occurrence after the date ``after`` from any of the
-    #      events in ``self.events``
-    #      """
-    #      from events.models import Occurrence
-    #      if after is None:
-    #          after = datetime.datetime.now()
-    #      occ_replacer = OccurrenceReplacer(
-    #          Occurrence.objects.filter(event__in = self.events))
-    #      generators = [event._occurrences_after_generator(after) for event in self.events]
-    #      occurrences = []
-    # 
-    #      for generator in generators:
-    #          try:
-    #              heapq.heappush(occurrences, (generator.next(), generator))
-    #          except StopIteration:
-    #              pass
-    # 
-    #      while True:
-    #          if len(occurrences) == 0: raise StopIteration
-    # 
-    #          generator=occurrences[0][1]
-    # 
-    #          try:
-    #              next = heapq.heapreplace(occurrences, (generator.next(), generator))[0]
-    #          except StopIteration:
-    #              next = heapq.heappop(occurrences)[0]
-    #          yield occ_replacer.get_occurrence(next)
- 
+def datetimeify(d, t=None, clamp=MIN):
+    # pass in a date or a date and a time or a datetime, pass out a datetime.
+    if isinstance(d, datetime):
+        return d
+    if t:
+        return datetime.combine(d, t)
+    if clamp.lower()==MAX:
+        return datetime.combine(d, time.max)
+    return datetime.combine(d, time.min)
 
 class OccurrenceReplacer(object):
     """
@@ -70,7 +39,7 @@ class OccurrenceReplacer(object):
             occ)
 
     def has_occurrence(self, occ):
-        return (occ.generator.event, occ.original_start, occ.original_end) in self.lookup
+        return (occ.generator.event, occ.unvaried_timerange.start, occ.unvaried_timerange.end) in self.lookup
 
     def get_additional_occurrences(self, start, end):
         """

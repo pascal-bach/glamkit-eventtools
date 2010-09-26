@@ -7,7 +7,6 @@ from django.core.urlresolvers import reverse
 from eventtools.conf.settings import FIRST_DAY_OF_WEEK
 from eventtools.tests.eventtools_testapp.models import *
 from eventtools.periods import Period, Month, Day, Year
-from eventtools.utils import EventListManager
 from eventtools.models import Rule
 from _inject_app import TestCaseWithApp as TestCase
 
@@ -40,7 +39,7 @@ class TestPeriod(TestCase):
 
     def test_get_occurrences(self):
         occurrence_list = self.period.occurrences
-        self.assertEqual(["%s to %s" %(o.start, o.end) for o in occurrence_list],
+        self.assertEqual(["%s to %s" %(o.timerange.start, o.timerange.end) for o in occurrence_list],
             ['2008-01-05 08:00:00 to 2008-01-05 09:00:00',
              '2008-01-12 08:00:00 to 2008-01-12 09:00:00',
              '2008-01-19 08:00:00 to 2008-01-19 09:00:00'])
@@ -49,8 +48,8 @@ class TestPeriod(TestCase):
         occurrence_dicts = self.period.get_occurrence_partials()
         self.assertEqual(
             [(occ_dict["class"],
-            occ_dict["occurrence"].start,
-            occ_dict["occurrence"].end)
+            occ_dict["occurrence"].timerange.start,
+            occ_dict["occurrence"].timerange.end)
             for occ_dict in occurrence_dicts],
             [
                 (1,

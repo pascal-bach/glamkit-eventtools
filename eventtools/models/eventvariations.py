@@ -61,7 +61,7 @@ class EventVariationBase(models.Model):
 
     def __unicode__(self):
         return u"%s (%s)" % (self.unvaried_event, self.reason)
-        
+    
     class Meta:
         abstract = True
-        ordering = ['unvaried_event__title', 'reason']
+        ordering = ['unvaried_event', 'reason']

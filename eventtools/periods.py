@@ -52,7 +52,7 @@ class Period(object):
         occurrences = []
         if hasattr(self, "occurrence_pool") and self.occurrence_pool is not None:
             for occurrence in self.occurrence_pool:
-                if occurrence.start <= self.end and occurrence.end >= self.start:
+                if occurrence.timerange.start <= self.end and occurrence.timerange.end >= self.start:
                     occurrences.append(occurrence)
             return occurrences
         for event in self.events:
@@ -92,13 +92,13 @@ class Period(object):
     def classify_occurrence(self, occurrence):
         if occurrence.cancelled and not SHOW_CANCELLED_OCCURRENCES:
             return
-        if occurrence.start > self.end or occurrence.end < self.start:
+        if occurrence.timerange.start > self.end or occurrence.timerange.end < self.start:
             return None
         started = False
         ended = False
-        if occurrence.start >= self.start and occurrence.start < self.end:
+        if occurrence.timerange.start >= self.start and occurrence.timerange.start < self.end:
             started = True
-        if occurrence.end >=self.start and occurrence.end< self.end:
+        if occurrence.timerange.end >=self.start and occurrence.timerange.end< self.end:
             ended = True
         if started and ended:
             return {'occurrence': occurrence, 'class': 1}

@@ -249,4 +249,15 @@ class TestQueries(TestCase):
             first_end_date=end_date
         )
         
-        gardeners_question_time.generators.occurrences_between(start_date, end_date)
+        summercamp.generators.occurrences_between(start_date, end_date)
+        
+    def test_date_only_events(self):
+        pass
+        """
+        Test that:
+        * can be saved
+        * generated occurrences also use dates only, have date_only == True
+        * saved occurrences can have time set (e.g. from unknown -> known)
+        * in lists, date_only events appear first
+        * in lists, occurrences with time set appear in the right order
+        """
