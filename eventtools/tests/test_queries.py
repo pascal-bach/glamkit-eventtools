@@ -89,7 +89,7 @@ class TestQueries(TestCase):
             repeat_until=start_date+timedelta(7),
         )
         
-        self.assertEqual(len(BroadcastEventOccurrenceGenerator.objects.occurrences_between(start_date, end_date)), 2)
+        self.assertEqual(len(BroadcastEvent.OccurrenceGenerator.objects.occurrences_between(start_date, end_date)), 2)
         
         #starting within, ending after
         gardeners_question_time.create_generator(
@@ -100,7 +100,7 @@ class TestQueries(TestCase):
             repeat_until=end_date+timedelta(7),
         )
         
-        self.assertEqual(len(BroadcastEventOccurrenceGenerator.objects.occurrences_between(start_date, end_date)), 6)
+        self.assertEqual(len(BroadcastEvent.OccurrenceGenerator.objects.occurrences_between(start_date, end_date)), 6)
         self.assertEqual(len(gardeners_question_time.generators.occurrences_between(start_date, end_date)), 4)
         
         #Now continue with the combinations of overlaps. We'll remove all generators inbetween.

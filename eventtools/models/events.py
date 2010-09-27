@@ -8,6 +8,7 @@ from occurrencegenerators import *
 from occurrences import *
 from utils import occurrences_to_events
 from eventtools.deprecated import deprecated
+from dynamicmodel import create_model_for_module
 
 from django.core.exceptions import ValidationError
 
@@ -105,45 +106,33 @@ class EventModelBase(ModelBase):
         
         The two generated classes are ModelNameOccurrence and ModelNameOccurrenceGenerator.        
         """
+        
+        
         if name != 'EventBase': # This should only fire if this is a subclass (maybe we should make devs apply this metaclass to their subclass instead?)
             # Build names for the new classes
             occ_name = "%s%s" % (name, "Occurrence")
             gen_name = "%s%s" % (occ_name, "Generator")
-        
-            cls.add_to_class('_occurrence_model_name', occ_name)
-            cls.add_to_class('_generator_model_name', gen_name)
-        
-            # Create the generator class
-            generator_fields = {
-                '__module__': cls.__module__,
-                'event': models.ForeignKey(cls, related_name = 'generators'),
-                '_occurrence_model_name': occ_name,
-            }
-            generator_class = type(gen_name, (OccurrenceGeneratorBase,), generator_fields)
-            # This will also work:
-            #generator_class = ModelBase.__new__(ModelBase, gen_name, (OccurrenceGeneratorBase,), generator_fields)
-
-            # Inject the model into its parent module
-            setattr(sys.modules[cls.__module__], gen_name, generator_class)
             
-            # Create the occurrence class
+            generator_fields = {
+                    '__module__': cls.__module__,
+                    'event': models.ForeignKey(cls, related_name = 'generators'),
+                    '_occurrence_model_name': occ_name,
+                }
+            gen_model = create_model_for_module(gen_name, cls.__module__, generator_fields, (OccurrenceGeneratorBase,))
+           
             occurrence_fields = {
                 '__module__': cls.__module__,
-                'generator': models.ForeignKey(generator_class, related_name = 'occurrences'),
+                'generator': models.ForeignKey(gen_name, related_name = 'occurrences'),
             }
             if hasattr(cls, 'varied_by'):
-                occurrence_fields['_varied_event'] = models.ForeignKey(cls.varied_by, related_name = 'occurrences', null=True,blank=True,help_text="Create or add a variation to alter venue, price, description, etc...")
+                occurrence_fields['_varied_event'] = models.ForeignKey(cls.varied_by, related_name = 'occurrences', null=True,blank=True,help_text=_("Create or add a variation to alter venue, price, description, etc..."))
                 # we need to add an unvaried_event FK into the variation class, BUT at this point the
                 # variation class hasn't been defined yet. For now, let's insist that this is done by
-                # using a base class for variation.
-            occurrence_class = type(occ_name, (OccurrenceBase,), occurrence_fields)
-            
-            # Inject it into its rightful module
-            setattr(sys.modules[cls.__module__], occ_name, occurrence_class)
-            
-            # Undocumented Django API: this regenerates the related objects cache for the EventBase
-            # derived model, ensuring that delete() calls catch its occurrences and occurrence generators 
-            cls._meta._fill_related_objects_cache()
+                # using a base class for variation.      
+            occ_model = create_model_for_module(occ_name, cls.__module__, occurrence_fields, (OccurrenceBase,))
+                        
+            cls.add_to_class('Occurrence', occ_model)
+            cls.add_to_class('OccurrenceGenerator', gen_model)         
 
         super(EventModelBase, cls).__init__(name, bases, attrs)
 
@@ -155,8 +144,8 @@ class EventBase(models.Model):
     """
     
     #injected by EventModelBase:
-    # _occurrence_model_name
-    # _generator_model_name
+    # Occurrence
+    # OccurrenceGenerator
     
     __metaclass__ = EventModelBase
     _date_description = models.TextField(_("Describe when this event occurs"), blank=True, help_text=_("e.g. \"Every Tuesday and Thursday in March 2010\". If this is omitted, an automatic description will be attempted."))
@@ -188,14 +177,6 @@ class EventBase(models.Model):
     def _opts(self):
         return self._meta
     opts = property(_opts) #for use in templates (without underscore necessary)
-
-    def _occurrence_model(self):
-        return models.get_model(self._meta.app_label, self._occurrence_model_name)
-    OccurrenceModel = property(_occurrence_model)
-
-    def _generator_model(self):
-        return models.get_model(self._meta.app_label, self._generator_model_name)
-    GeneratorModel = property(_generator_model)
 
     def _has_zero_generators(self):
         return self.generators.count() == 0
@@ -337,3 +318,15 @@ class EventBase(models.Model):
         else:
             period = Period(self.generators.all(), datetime.datetime.now(), datetime.datetime.now() + datetime.timedelta(days=num_days))
         return period.get_occurrences()
+
+    #deprecations
+    @deprecated
+    def _occurrence_model(self):
+        return type(self).Occurrence
+    OccurrenceModel = property(_occurrence_model)
+
+    @deprecated
+    def _generator_model(self):
+        return type(self).Generator
+    GeneratorModel = property(_generator_model)
+

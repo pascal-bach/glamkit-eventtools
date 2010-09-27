@@ -34,7 +34,7 @@ class Period(object):
         self.events = events
         
         if self.events:
-            self.OccurrenceModel = events[0].OccurrenceModel
+            self.OccurrenceModel = type(events[0]).Occurrence
         else:
             self.OccurrenceModel = None
         

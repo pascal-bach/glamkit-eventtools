@@ -72,7 +72,7 @@ class TestModel(TestCase):
         self.assertTrue(occ)
         
         #Test that the occurrence is the one we expect
-        expected = LectureEventOccurrence(generator=gen, unvaried_start_date=date(2010, 1, 1), unvaried_start_time=time(13, 0), unvaried_end_time=time(14, 0))
+        expected = LectureEvent.Occurrence(generator=gen, unvaried_start_date=date(2010, 1, 1), unvaried_start_time=time(13, 0), unvaried_end_time=time(14, 0))
 
         self.assertEqual(occ, expected)
 
