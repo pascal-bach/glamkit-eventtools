@@ -1,5 +1,5 @@
 from django.forms import ModelForm
-from .models import LectureEvent, LectureEventOccurrence, LectureEventOccurrenceGenerator
+from .models import LectureEvent
 
 
 class LectureEventForm(ModelForm):
@@ -8,8 +8,8 @@ class LectureEventForm(ModelForm):
 
 class LectureEventOccurrenceForm(ModelForm):
     class Meta:
-        model = LectureEventOccurrence
+        model = LectureEvent.Occurrence
 
 class LectureEventOccurrenceGeneratorForm(ModelForm):
     class Meta:
-        model = LectureEventOccurrenceGenerator
+        model = LectureEvent.OccurrenceGenerator

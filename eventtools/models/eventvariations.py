@@ -45,8 +45,9 @@ class EventVariationModelBase(ModelBase):
         if name != 'EventVariationBase': # This should only fire if this is a subclass
             #Inject an unvaried_event FK if none is defined.
             #Uses the unDRY cls.varies to name the class to FK to.
-            if not attrs.has_key('unvaried_event'):
+            if not attrs.has_key('unvaried_event') and not hasattr(cls, 'unvaried_event'):
                 cls.add_to_class('unvaried_event', models.ForeignKey(cls.varies, related_name="variations"))
+                # cls._meta._fill_related_objects_cache()
                 
         super(EventVariationModelBase, cls).__init__(name, bases, attrs)
 
