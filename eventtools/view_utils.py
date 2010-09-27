@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from django.conf import settings
-from date_range import days_in_month, humanized_date_range
+from pprint_datetime_span import days_in_month, humanized_date_range
 from dateutil.relativedelta import relativedelta
 from dateutil import parser as dateparser
 

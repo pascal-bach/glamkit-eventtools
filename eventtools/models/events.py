@@ -58,7 +58,7 @@ class EventQuerySetBase(models.query.QuerySet):
 
     @deprecated
     def between_days(self, startday, endday, hide_hidden=True):
-        return self.between(self, startday, endday, hide_hidden)
+        return self.between(startday, endday, hide_hidden)
 
     @deprecated
     def occurrences_on_day(self, day, hide_hidden=True):
@@ -75,27 +75,27 @@ class EventManagerBase(models.Manager):
     def get_query_set(self): 
         return EventQuerySetBase(self.model)
         
-    def occurrences_between(self, start, end):
-        return self.get_query_set().occurrences_between(start, end)
+    def occurrences_between(self, start, end, hide_hidden=True):
+        return self.get_query_set().occurrences_between(start, end, hide_hidden)
         
-    def between(self, start, end):
-         return self.get_query_set().between(start, end)
+    def between(self, start, end, hide_hidden=True):
+         return self.get_query_set().between(start, end, hide_hidden)
     
     @deprecated     
-    def occurrences_between_days(self, startday, endday):
-         return self.get_query_set().occurrences_between_days(startday, endday)
+    def occurrences_between_days(self, startday, endday, hide_hidden=True):
+         return self.get_query_set().occurrences_between_days(startday, endday, hide_hidden)
 
     @deprecated
-    def between_days(self, startday, endday):
-         return self.get_query_set().between_days(startday, endday)
+    def between_days(self, startday, endday, hide_hidden=True):
+         return self.get_query_set().between_days(startday, endday, hide_hidden)
          
     @deprecated
-    def occurrences_on_day(self, day):
-        return self.get_query_set().on_day(day)
+    def occurrences_on_day(self, day, hide_hidden=True):
+        return self.get_query_set().on_day(day, hide_hidden)
 
     @deprecated
-    def on_day(self, day):
-        return self.get_query_set().on_day(day)
+    def on_day(self, day, hide_hidden=True):
+        return self.get_query_set().on_day(day, hide_hidden)
 
 
 class EventModelBase(ModelBase):
@@ -175,12 +175,12 @@ class EventBase(models.Model):
         if self.variations_count() > 0 and not self.date_description:
             raise ValidationError("Sorry, we can't figure out how to describe an event with variations. Please add your own date description under Visitor Info.")
 
-    def date_description(self, hide_hidden=True):
+    def date_description(self): # Took out hide_hidden - why would you want to hide a generator?
         if self._date_description:
             return self._date_description
         gens = self.generators.all()
         if gens:
-            return _("\n ").join([g.date_description() for g in gens if not hide_hidden or not g.is_hidden()])
+            return _("\n ").join([g.date_description() for g in gens])
         else:
             return _("Date TBA")
     date_description = property(date_description)
@@ -217,7 +217,7 @@ class EventBase(models.Model):
     get_one_occurrence = get_first_occurrence # for backwards compatibility
     
     @deprecated
-    def get_occurrences(self, start, end, hide_hidden):
+    def get_occurrences(self, start, end, hide_hidden=True):
         return self.occurrences_between(start, end, hide_hidden)
         
     def occurrences_between(self, start, end, hide_hidden=True):

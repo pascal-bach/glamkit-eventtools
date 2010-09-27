@@ -39,12 +39,12 @@ def month_calendar(context, events_pool=[], month=None, show_header=True, select
         events_pool = [events_pool]
     
     for event in events_pool:
-        occs = event.get_occurrences(month_calendar[0][0], month_calendar[-1][-1])
+        occs = event.occurrences_between(month_calendar[0][0], month_calendar[-1][-1])
         for occ in occs:
-            if events_by_date.has_key(occ.start_date):
-                events_by_date[occ.start_date].append(occ.merged_event)
+            if events_by_date.has_key(occ.timespan.start_date):
+                events_by_date[occ.timespan.start_date].append(occ.merged_event)
             else:
-                events_by_date[occ.start_date] = [occ.merged_event]
+                events_by_date[occ.timespan.start_date] = [occ.merged_event]
 
     # annotate each day with a list of class names that describes their status in the calendar - not_in_month, today, selected
     def annotate(day):
