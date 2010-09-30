@@ -233,7 +233,9 @@ class EventBase(models.Model):
         
         return list(set(sorted(occs + variation_occs)))
     
-    def get_last_day(self):
+    
+    
+    def get_last_occurrence_end(self):
         lastdays = []
         for generator in self.generators.all():
             if generator.repeat_until:
@@ -249,6 +251,13 @@ class EventBase(models.Model):
             return lastdays[-1]
         except IndexError:
             return None
+
+    def has_finished(self):
+        now = datetime.datetime.now()
+        if self.get_last_occurrence_end() < now:
+            return True
+        return False
+
 
     def edit_occurrences_link(self):
         """ An admin link """
@@ -330,3 +339,6 @@ class EventBase(models.Model):
         return type(self).Generator
     GeneratorModel = property(_generator_model)
 
+    @deprecated
+    def get_last_day(self):
+        return self.get_last_occurrence_end()
