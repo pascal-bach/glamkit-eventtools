@@ -41,12 +41,14 @@ class OccurrenceReplacer(object):
     def has_occurrence(self, occ):
         return (occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end) in self.lookup
 
-    def get_additional_occurrences(self, start, end):
+    def get_additional_occurrences(self, start_dt, end_dt):
         """
         Return exceptional occurrences which are now in the period
         """
         for key, occ in self.lookup.items():
-            if (occ.timespan.start < end and occ.timespan.start >= start and occ.timespan.end >= start and not occ.cancelled):
+            # omitted and occ.timespan.end_datetime >= start_dt - unneccessary.
+            # other reasons, except cancelled, to omit?
+            if (occ.timespan.start_datetime >= start_dt and occ.timespan.start_datetime < end_dt and not occ.cancelled):
                 yield occ
 
 class check_event_permissions(object):

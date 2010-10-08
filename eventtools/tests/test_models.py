@@ -133,7 +133,30 @@ class TestModel(TestCase):
         self.assertEqual(occ.merged_event.title, 'Butterflies I have known')
         self.assertEqual(occ.varied_event.title, 'Butterflies I have known')
 
-
+    # not done yet
+    # def test_operator(self):
+    #     te1 = LectureEvent.objects.create(location='The lecture hall', title='Lecture series on Butterflies')
+    #     gen = te1.create_generator(first_start_date=date(2010, 1, 1), first_start_time=time(13, 0), first_end_date=date(2010, 1, 4), first_end_time=time(14, 0))
+    # 
+    #     gen2 = gen + timedelta(days=1, hours=1)
+    #     self.assertEqual(gen2.first_start_date, date(2010, 1, 2))
+    #     self.assertEqual(gen2.first_end_date, date(2010, 1, 5))
+    #     self.assertEqual(gen2.first_start_time, time(14,0))
+    #     self.assertEqual(gen2.first_end_time, time(15,0))
+    #     self.assertNotEqual(gen, gen2)
+    #     
+    #     occ = gen2.get_first_occurrence()
+    #     occ2 = occ + timedelta(days=1, hours=1)
+    #     self.assertEqual(occ2.unvaried_timespan.start_date, date(2010, 1, 2))
+    #     self.assertEqual(occ2.unvaried_timespan.end_date, date(2010, 1, 5))
+    #     self.assertEqual(occ2.unvaried_timespan.start_time, time(14,0))
+    #     self.assertEqual(occ2.unvaried_timespan.end_time, time(15,0))
+    #     self.assertEqual(occ2.varied_timespan.start_date, date(2010, 1, 3))
+    #     self.assertEqual(occ2.varied_timespan.end_date, date(2010, 1, 6))
+    #     self.assertEqual(occ2.varied_timespan.start_time, time(15,0))
+    #     self.assertEqual(occ2.varied_timespan.end_time, time(16,0))
+    #     self.assertNotEqual(occ, occ2)
+        
 
     def test_saving(self):
         """
@@ -302,3 +325,222 @@ class TestModel(TestCase):
         # but not on an event that doesn't have a varied_by
         lesson = LessonEvent.objects.create(subject="canons")
         self.assertRaises(AttributeError, lesson.create_variation, {'subject': 'cannons'})
+        
+class TestGeneratorChange(TestCase):
+    def test_generator_resave(self):
+        """
+        If we change the times of a generator, then all of the persisted occurrences should be resaved accordingly.
+        """
+        weekly = Rule.objects.create(name="weekly", frequency="WEEKLY")
+        subject = 'Django testing for n00bs'
+        lecture = LectureEvent.objects.create(title=subject, location="The attic")
+        new_year = date(2010, 1, 1)
+        datetime_gen = lecture.create_generator(first_start_date=new_year, first_start_time=time(13, 0), first_end_time=time(13, 0), rule=weekly)
+        
+        # vary the 1st jan event to start at 13.30 and finish at 14.30
+        same_day_diff_time = datetime_gen.get_occurrences(new_year).next()
+        same_day_diff_time.varied_start_time = time(13,30)
+        same_day_diff_time.varied_end_time = time(14,30)
+        same_day_diff_time.save()
+
+        # vary the 8th jan event to be on 6th Jan
+        diff_day_same_time = datetime_gen.get_occurrences(new_year+timedelta(7)).next()
+        diff_day_same_time.varied_start_date = new_year+timedelta(5)
+        diff_day_same_time.varied_end_date = new_year+timedelta(5)
+        diff_day_same_time.save()
+
+        #vary the 15th jan event to have a different location
+        diff_location = datetime_gen.get_occurrences(new_year+timedelta(14)).next()
+        diff_location.create_varied_event(location = "The basement")
+
+        #NOW let's change the original generator.
+        datetime_gen.first_start_date += timedelta(1)
+        datetime_gen.first_end_date += timedelta(1)
+        datetime_gen.first_start_time = time(14,0)
+        datetime_gen.first_end_time = time(14,0)
+        datetime_gen.save()
+        
+        #Persisted occurrences with modified times should show updated unvaried times but the *same* varied times as before.
+        same_day_diff_time = datetime_gen.get_occurrences(new_year).next()
+        self.assertEqual(same_day_diff_time.unvaried_start_date, date(2010, 1, 2))
+        self.assertEqual(same_day_diff_time.varied_start_date, date(2010, 1, 1))
+        self.assertEqual(same_day_diff_time.unvaried_end_date, date(2010, 1, 2))
+        self.assertEqual(same_day_diff_time.varied_end_date, date(2010, 1, 1))
+        
+        self.assertEqual(same_day_diff_time.unvaried_start_time, time(14,0))
+        self.assertEqual(same_day_diff_time.varied_start_time, time(13,30))
+        self.assertEqual(same_day_diff_time.unvaried_end_time, time(14,0))
+        self.assertEqual(same_day_diff_time.varied_end_time, time(14,30))
+
+        diff_day_same_time = datetime_gen.get_occurrences(new_year+timedelta(5)).next()
+        self.assertEqual(diff_day_same_time.unvaried_start_date, date(2010, 1, 9))
+        self.assertEqual(diff_day_same_time.varied_start_date, date(2010, 1, 6))
+        self.assertEqual(diff_day_same_time.unvaried_end_date, date(2010, 1, 9))
+        self.assertEqual(diff_day_same_time.varied_end_date, date(2010, 1, 6))
+        
+        self.assertEqual(diff_day_same_time.unvaried_start_time, time(14,0))
+        self.assertEqual(diff_day_same_time.varied_start_time, time(13,0))
+        self.assertEqual(diff_day_same_time.unvaried_end_time, time(14,0))
+        self.assertEqual(diff_day_same_time.varied_end_time, time(13,0))
+
+        #Persisted occurrences with UNmodified times should show updated unvaried times AND varied times.
+        diff_location = datetime_gen.get_occurrences(new_year+timedelta(15)).next()
+        self.assertEqual(diff_location.unvaried_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.unvaried_end_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_end_date, date(2010, 1, 16))
+        
+        self.assertEqual(diff_location.unvaried_start_time, time(14,0))
+        self.assertEqual(diff_location.varied_start_time, time(14,0))
+        self.assertEqual(diff_location.unvaried_end_time, time(14,0))
+        self.assertEqual(diff_location.varied_end_time, time(14,0))
+
+    def test_dateonly_generator_resave(self):
+        """
+        If we change the times of a generator, then all of the persisted occurrences should be resaved accordingly.
+        """
+        weekly = Rule.objects.create(name="weekly", frequency="WEEKLY")
+        subject = 'Django testing for n00bs'
+        lecture = LectureEvent.objects.create(title=subject, location="The attic")
+        new_year = date(2010, 1, 1)
+        date_gen = lecture.create_generator(first_start_date=new_year, rule=weekly)
+        
+        # vary the 1st jan event to start at 13.30 and finish at 14.30
+        same_day_plus_time = date_gen.get_occurrences(new_year).next()
+        same_day_plus_time.varied_start_time = time(13,30)
+        same_day_plus_time.varied_end_time = time(14,30)
+        same_day_plus_time.save()
+
+        # vary the 8th jan event to be on 6th Jan
+        diff_day = date_gen.get_occurrences(new_year+timedelta(7)).next()
+        diff_day.varied_start_date = new_year+timedelta(5)
+        diff_day.varied_end_date = new_year+timedelta(5)
+        diff_day.save()
+
+        #vary the 15th jan event to have a different location
+        diff_location = date_gen.get_occurrences(new_year+timedelta(14)).next()
+        diff_location.create_varied_event(location = "The basement")
+
+        #NOW let's change the original generator.
+        date_gen.first_start_date += timedelta(1)
+        date_gen.first_end_date += timedelta(1)
+        date_gen.save()
+        
+        #Persisted occurrences with modified times should show updated unvaried times but the *same* varied times as before.
+        same_day_plus_time = date_gen.get_occurrences(new_year).next()
+        self.assertEqual(same_day_plus_time.unvaried_start_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_start_date, date(2010, 1, 1))
+        self.assertEqual(same_day_plus_time.unvaried_end_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_end_date, date(2010, 1, 1))
+        
+        self.assertEqual(same_day_plus_time.unvaried_start_time, None)
+        self.assertEqual(same_day_plus_time.varied_start_time, time(13,30))
+        self.assertEqual(same_day_plus_time.unvaried_end_time, None)
+        self.assertEqual(same_day_plus_time.varied_end_time, time(14,30))
+
+        diff_day = date_gen.get_occurrences(new_year+timedelta(5)).next()
+        self.assertEqual(diff_day.unvaried_start_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_start_date, date(2010, 1, 6))
+        self.assertEqual(diff_day.unvaried_end_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_end_date, date(2010, 1, 6))
+        
+        self.assertEqual(diff_day.unvaried_start_time, None)
+        self.assertEqual(diff_day.varied_start_time, None)
+        self.assertEqual(diff_day.unvaried_end_time, None)
+        self.assertEqual(diff_day.varied_end_time, None)
+
+        #Persisted occurrences with UNmodified times should show updated unvaried times AND varied times.
+        diff_location = date_gen.get_occurrences(new_year+timedelta(15)).next()
+        self.assertEqual(diff_location.unvaried_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.unvaried_end_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_end_date, date(2010, 1, 16))
+        
+        self.assertEqual(diff_location.unvaried_start_time, None)
+        self.assertEqual(diff_location.varied_start_time, None)
+        self.assertEqual(diff_location.unvaried_end_time, None)
+        self.assertEqual(diff_location.varied_end_time, None)
+
+        #NOW let's add a time to the generator!
+        date_gen.first_start_time = time(14,0)
+        date_gen.first_end_time = time(14,0)
+        date_gen.save()
+        
+        #Persisted occurrences with modified times should show updated unvaried times but the *same* varied times as before.
+        same_day_plus_time = date_gen.get_occurrences(new_year).next()
+        self.assertEqual(same_day_plus_time.unvaried_start_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_start_date, date(2010, 1, 1))
+        self.assertEqual(same_day_plus_time.unvaried_end_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_end_date, date(2010, 1, 1))
+        
+        self.assertEqual(same_day_plus_time.unvaried_start_time, time(14,0))
+        self.assertEqual(same_day_plus_time.varied_start_time, time(13,30))
+        self.assertEqual(same_day_plus_time.unvaried_end_time, time(14,0))
+        self.assertEqual(same_day_plus_time.varied_end_time, time(14,30))
+
+        diff_day = date_gen.get_occurrences(new_year+timedelta(5)).next()
+        self.assertEqual(diff_day.unvaried_start_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_start_date, date(2010, 1, 6))
+        self.assertEqual(diff_day.unvaried_end_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_end_date, date(2010, 1, 6))
+        
+        self.assertEqual(diff_day.unvaried_start_time, time(14,0))
+        self.assertEqual(diff_day.varied_start_time, None)
+        self.assertEqual(diff_day.unvaried_end_time, time(14,0))
+        self.assertEqual(diff_day.varied_end_time, None)
+
+        #Persisted occurrences with UNmodified times should show updated unvaried times AND varied times.
+        diff_location = date_gen.get_occurrences(new_year+timedelta(15)).next()
+        self.assertEqual(diff_location.unvaried_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.unvaried_end_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_end_date, date(2010, 1, 16))
+        
+        self.assertEqual(diff_location.unvaried_start_time, time(14,0))
+        self.assertEqual(diff_location.varied_start_time, time(14,0))
+        self.assertEqual(diff_location.unvaried_end_time, time(14,0))
+        self.assertEqual(diff_location.varied_end_time, time(14,0))
+
+        #NOW let's remove a time from the generator!
+        date_gen.first_start_time = None
+        date_gen.first_end_time = None
+        date_gen.save(test=True)
+        
+        #Persisted occurrences with modified times should show updated unvaried times but the *same* varied times as before.
+        same_day_plus_time = date_gen.get_occurrences(new_year).next()
+        self.assertEqual(same_day_plus_time.unvaried_start_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_start_date, date(2010, 1, 1))
+        self.assertEqual(same_day_plus_time.unvaried_end_date, date(2010, 1, 2))
+        self.assertEqual(same_day_plus_time.varied_end_date, date(2010, 1, 1))
+        
+        self.assertEqual(same_day_plus_time.unvaried_start_time, None)
+        self.assertEqual(same_day_plus_time.varied_start_time, time(13,30))
+        self.assertEqual(same_day_plus_time.unvaried_end_time, None)
+        self.assertEqual(same_day_plus_time.varied_end_time, time(14,30))
+
+        diff_day = date_gen.get_occurrences(new_year+timedelta(5)).next()
+        self.assertEqual(diff_day.unvaried_start_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_start_date, date(2010, 1, 6))
+        self.assertEqual(diff_day.unvaried_end_date, date(2010, 1, 9))
+        self.assertEqual(diff_day.varied_end_date, date(2010, 1, 6))
+        
+        self.assertEqual(diff_day.unvaried_start_time, None)
+        self.assertEqual(diff_day.varied_start_time, None)
+        self.assertEqual(diff_day.unvaried_end_time, None)
+        self.assertEqual(diff_day.varied_end_time, None)
+
+        #Persisted occurrences with UNmodified times should show updated unvaried times AND varied times.
+        diff_location = date_gen.get_occurrences(new_year+timedelta(15)).next()
+        self.assertEqual(diff_location.unvaried_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_start_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.unvaried_end_date, date(2010, 1, 16))
+        self.assertEqual(diff_location.varied_end_date, date(2010, 1, 16))
+        
+        self.assertEqual(diff_location.unvaried_start_time, None)
+        self.assertEqual(diff_location.varied_start_time, None)
+        self.assertEqual(diff_location.unvaried_end_time, None)
+        self.assertEqual(diff_location.varied_end_time, None)
+
+         
+    # def test_the_occurrence_admin(self):
+    #      assert False
