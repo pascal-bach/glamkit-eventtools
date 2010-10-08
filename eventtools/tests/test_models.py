@@ -462,8 +462,11 @@ class TestGeneratorChange(TestCase):
         self.assertEqual(diff_location.varied_end_time, None)
 
         #NOW let's add a time to the generator!
+        self.assertEqual(unicode(date_gen), "2 January 2010, repeating weekly")
         date_gen.first_start_time = time(14,0)
+        self.assertEqual(unicode(date_gen), "2 January 2010, 2pm, repeating weekly")
         date_gen.first_end_time = time(14,0)
+        self.assertEqual(unicode(date_gen), "2 January 2010, 2pm, repeating weekly")
         date_gen.save()
         
         #Persisted occurrences with modified times should show updated unvaried times but the *same* varied times as before.

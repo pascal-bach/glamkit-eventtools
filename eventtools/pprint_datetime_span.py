@@ -250,9 +250,9 @@ def pprint_datetime_span(d1, t1, d2=None, t2=None,
     }
      
 
-    if d2 is not None:
+    if d2 is not None and d2 != d1:
         if t1 is not None:
-            if t2 is not None:
+            if t2 is not None and t2 != t1:
                 formatstring = "%(d1)s, %(t1)s until %(t2)s on %(d2)s"
             else:
                 formatstring = "%(d1)s, %(t1)s until %(d2)s"
@@ -264,7 +264,7 @@ def pprint_datetime_span(d1, t1, d2=None, t2=None,
 
     else:
         if t1 is not None:
-            if t2 is not None:
+            if t2 is not None and t2 != t1:
                 return "%(d)s, %(t)s" % {
                     'd': pprint_date_span(d1, d1, **datekwargs),
                     't': pprint_time_span(t1, t2, **timekwargs), # *******
@@ -297,6 +297,8 @@ if __name__ == "__main__":
             
             self.ae(pprint_datetime_span(d1, None), "23 September 2010")
             self.ae(pprint_datetime_span(d1, t1), "23 September 2010, 12:42pm")
+            self.ae(pprint_datetime_span(d1, t1, d1), "23 September 2010, 12:42pm")
+            self.ae(pprint_datetime_span(d1, t1, d1, t1), "23 September 2010, 12:42pm")
             self.ae(pprint_datetime_span(d1, None, d2, None), "23-24 September 2010")
             self.ae(pprint_datetime_span(d1, t1, None, t2), "23 September 2010, 12:42-2:42pm")
             self.ae(pprint_datetime_span(d1, t1, d1, t2), "23 September 2010, 12:42-2:42pm")

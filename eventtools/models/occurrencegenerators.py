@@ -202,13 +202,13 @@ class OccurrenceGeneratorBase(models.Model):
     def robot_description(self):
         if self.rule:
             if self.repeat_until:
-                return "%s repeating %s until %s" % (
+                return "%s, repeating %s until %s" % (
                     self.timespan.robot_description(),
                     self.rule,
                     pprint_date_span(self.repeat_until, self.repeat_until)
                 )
             else:
-                return "%s repeating %s" % (
+                return "%s, repeating %s" % (
                     self.timespan.robot_description(),
                     self.rule,
                 )
