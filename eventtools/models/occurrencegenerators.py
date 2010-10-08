@@ -80,7 +80,7 @@ class OccurrenceGeneratorBase(models.Model):
     
     first_start_date = models.DateField(_('start date of the first occurrence'))
     first_start_time = models.TimeField(_('start time of the first occurrence'), null=True, blank=True)
-    first_end_date = models.DateField(_('end date of the first occurrence'), null = True, blank = True, help_text=_("Only use for an event that starts once and lasts for several days (like a summer camp)."))
+    first_end_date = models.DateField(_('end date of the first occurrence'), blank = True, help_text=_("Only use for an event that starts once and lasts for several days (like a summer camp)."))
     first_end_time = models.TimeField(_('end time of the first occurrence'), null=True, blank=True)
 
     rule = models.ForeignKey(Rule, verbose_name=_("repetition rule"), null = True, blank = True, help_text=_("Select '----' for a one-off event."))
@@ -103,24 +103,99 @@ class OccurrenceGeneratorBase(models.Model):
         except AttributeError as e:
             raise ValidationError(e)            
 
-    # TODO check for boolean tests of time, and change to is not None
-
     def save(self, *args, **kwargs):
+        
+        if self.first_end_date is None:
+            self.first_end_date = self.first_start_date
+
         # if the occurrence generator changes, we must not break the link with persisted occurrences
         if self.id: # must already exist
-            for occ in self.occurrences.all(): # only persisted occurrences of course
-                occ.unvaried_start_date = self.first_start_date
-                occ.unvaried_start_time = self.first_start_time
-                occ.unvaried_end_date = self.first_end_date
-                occ.unvaried_end_time = self.first_end_time
-                occ.save()
+            saved_self = self.__class__.objects.get(pk=self.id)
+            
+            if self.timespan != saved_self.timespan:
+                # something has changed, so let's figure out the timeshifts for the generator
+                start_shift = self.timespan.start_datetime - saved_self.timespan.start_datetime
+                end_shift = self.timespan.end_datetime - saved_self.timespan.end_datetime
+                
+                added_times = saved_self.timespan.dates_only and not self.timespan.dates_only
+                removed_times = self.timespan.dates_only and not saved_self.timespan.dates_only
+            
+                if kwargs.has_key('test'):
+                    # import pdb; pdb.set_trace()
+                    del kwargs['test']
+            
+                for occ in self.occurrences.all(): # only persisted occurrences of course
+                    # If the occurrence has been moved from the generated times, we don't want to change anything
+                    # however, if it hasn't been moved (and only persists because of an EventVariation or cancellation)
+                    # then we need to shift the times to match.
+                    if not occ.is_moved:
+                        varied_start = occ.varied_timespan.start_datetime + start_shift
+                        varied_end = occ.varied_timespan.end_datetime + end_shift
+                        if occ.varied_timespan.dates_only: #we have to be careful about whether we end up with a date or a datetime
+                            occ.varied_start_date = varied_start.date()                            
+                            occ.varied_end_date = varied_end.date()
+                            if added_times:
+                                occ.varied_start_time = varied_start.time()
+                                occ.varied_end_time = varied_end.time()
+                            else:
+                                occ.varied_start_time = None
+                                occ.varied_end_time = None                                
+                        else: # the results are going to be datetimes
+                            occ.varied_start_date = varied_start.date()
+                            occ.varied_end_date = varied_end.date()
+                            if removed_times:
+                                occ.varied_start_time = None
+                                occ.varied_end_time = None                                
+                            else:
+                                occ.varied_start_time = varied_start.time()
+                                occ.varied_end_time = varied_end.time()
+
+                    # and then apply the new 'unvaried' times
+                    unvaried_start = occ.unvaried_timespan.start_datetime + start_shift
+                    unvaried_end = occ.unvaried_timespan.end_datetime + end_shift
+                    if occ.unvaried_timespan.dates_only: #we have to be careful about whether we end up with a date or a datetime
+                        occ.unvaried_start_date = unvaried_start.date()                            
+                        occ.unvaried_end_date = unvaried_end.date()
+                        if added_times:
+                            occ.unvaried_start_time = unvaried_start.time()
+                            occ.unvaried_end_time = unvaried_end.time()
+                        else:
+                            occ.unvaried_start_time = None
+                            occ.unvaried_end_time = None                                
+                    else: # the results are going to be datetimes
+                        occ.unvaried_start_date = unvaried_start.date()
+                        occ.unvaried_end_date = unvaried_end.date()
+                        if removed_times:
+                            occ.unvaried_start_time = None
+                            occ.unvaried_end_time = None                                
+                        else:
+                            occ.unvaried_start_time = unvaried_start.time()
+                            occ.unvaried_end_time = unvaried_end.time()
+
+                    occ.save()
         super(OccurrenceGeneratorBase, self).save(*args, **kwargs)
+    
+    
     
     
     @property
     def timespan(self):
         return SmartDateTimeSpan(self.first_start_date, self.first_start_time, self.first_end_date, self.first_end_time)
     
+    def _get_start_datetime(self):
+        return self.timespan.start_datetime
+    def _set_start_datetime(self, dt):
+        self.first_start_date = dt.date()
+        self.first_start_time = dt.time()
+    start_datetime = property(_get_start_datetime, _set_start_datetime)
+    
+    def _get_end_datetime(self):
+        return self.timespan.start_datetime
+    def _set_end_datetime(self, dt):
+        self.first_end_date = dt.date()
+        self.first_end_time = dt.time()
+    end_datetime = property(_get_end_datetime, _set_end_datetime)
+
     def date_description(self):
         return self._date_description or self.robot_description()
         
@@ -203,14 +278,16 @@ class OccurrenceGeneratorBase(models.Model):
                 yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=o_start, edt=o_end))
     
     #check
-    def get_occurrences(self, start, end, hide_hidden=True):
+    def get_occurrences(self, start, end=None, hide_hidden=True):
         """
         returns a list of occurrences between the datetimes ``start`` and ``end``.
         Includes all of the exceptional Occurrences.
         """
+        if end is None:
+            end = start
         
-        start = datetimeify(start)
-        end = datetimeify(end)
+        start = datetimeify(start, clamp="start")
+        end = datetimeify(end, clamp="end")
         
         exceptional_occurrences = self.occurrences.all()
         occ_replacer = OccurrenceReplacer(exceptional_occurrences)
@@ -222,7 +299,7 @@ class OccurrenceGeneratorBase(models.Model):
                 # ...but only if they're not hidden and you want to see them
                 if not (hide_hidden and p_occ.hide_from_lists):
                     # ...but only if they are within this period
-                    if p_occ.timespan.start >= start and p_occ.timespan.start < end and p_occ.timespan.end >= start:
+                    if p_occ.timespan.start_datetime >= start and p_occ.timespan.start_datetime < end and p_occ.timespan.end_datetime >= start:
                         yield p_occ
             else:
               yield occ
@@ -279,7 +356,8 @@ class OccurrenceGeneratorBase(models.Model):
         generator = self._occurrences_after_generator(after)
         while True:
             next = generator.next()
-            yield occ_replacer.get_occurrence(next)
+            yield occ_replacer.get_occurrence(next)    
+
     
     ### DEPRECATIONS
 

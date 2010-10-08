@@ -28,13 +28,13 @@ class OccurrenceBase(models.Model):
     #These four work as a key to the Occurrence
     unvaried_start_date = models.DateField(_("unvaried start date"), db_index=True)
     unvaried_start_time = models.TimeField(_("unvaried start time"), db_index=True, null=True)
-    unvaried_end_date = models.DateField(_("unvaried end date"), db_index=True, null=True, help_text=_("if omitted, start date is assumed"))
+    unvaried_end_date = models.DateField(_("unvaried end date"), db_index=True, help_text=_("if omitted, start date is assumed"))
     unvaried_end_time = models.TimeField(_("unvaried end time"), db_index=True, null=True)
     
     # These are usually the same as the unvaried, but may not always be.
     varied_start_date = models.DateField(_("varied start date"), blank=True, null=True, db_index=True)
     varied_start_time = models.TimeField(_("varied start time"), blank=True, null=True, db_index=True)
-    varied_end_date = models.DateField(_("varied end date"), blank=True, null=True, db_index=True, help_text=_("if omitted, start date is assumed"))
+    varied_end_date = models.DateField(_("varied end date"), blank=True, db_index=True, help_text=_("if omitted, start date is assumed"))
     varied_end_time = models.TimeField(_("varied end time"), blank=True, null=True, db_index=True, help_text=_("if omitted, start time is assumed"))
     
     cancelled = models.BooleanField(_("cancelled"), default=False)
@@ -89,6 +89,14 @@ class OccurrenceBase(models.Model):
         except AttributeError as e:
             raise ValidationError(e)
 
+    def save(self, *args, **kwargs):
+        if self.unvaried_end_date is None:
+            self.unvaried_end_date = self.unvaried_start_date
+        if self.varied_end_date is None:
+            self.varied_end_date = self.varied_start_date
+
+        super(OccurrenceBase, self).save(*args, **kwargs)
+
     @property
     def timespan(self):
         return SmartDateTimeSpan(self.varied_start_date, self.varied_start_time, self.varied_end_date, self.varied_end_time)
@@ -136,6 +144,10 @@ class OccurrenceBase(models.Model):
 
     def uncancel(self):
         self.cancelled = False
+        self.save()
+        
+    def create_varied_event(self, *args, **kwargs):
+        self.varied_event = self.generator.event.create_variation(*args, **kwargs)
         self.save()
 
     def __unicode__(self):

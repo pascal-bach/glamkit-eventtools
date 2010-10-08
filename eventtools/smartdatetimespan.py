@@ -28,10 +28,10 @@ class SmartDateTimeSpan(object):
             ed = edt.date()
             et = edt.time()
 
-        if not sd:
+        if sd is None:
             raise AttributeError("Start date is required")
 
-        if et and not st:
+        if et is not None and st is None:
             raise AttributeError("May not have an end time without a start time")
         
         #shortcuts
