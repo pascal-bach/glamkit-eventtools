@@ -371,7 +371,7 @@ class TestQueries(TestCase):
         self.assertEqual(occs[1].timespan.start_date, busy_day)
         self.assertEqual(occs[1].timespan.end_date, busy_day)
         self.assertEqual(occs[1].timespan.start_time, time(10,00))
-        self.assertEqual(occs[1].timespan.end_time, time(10,00)) #if end time is omitted, use start time
+        self.assertEqual(occs[1].timespan.end_time, None) #if end time is omitted, use None
         self.assertEqual(occs[1].event, hourlytour) # events without a time come first
         
         #let's say we know the time for next't week's camp

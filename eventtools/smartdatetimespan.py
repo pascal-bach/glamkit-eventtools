@@ -6,27 +6,29 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 from eventtools.deprecated import deprecated
 
 class SmartDateTimeSpan(object):
-    def __init__(self, sd=None, st=None, ed=None, et=None, sdt=None, edt=None):
+    def __init__(self, sd=None, st=None, ed=None, et=None, sdt=None, edt=None, use_start_time=True,  use_end_time=True):
         """
         Does commonly-needed things with time ranges that may or may not include times.
         
         RULES:
-        - start date is compulsory.
-        - start time and end time are not compulsory
-        - end time requires a start time.
+        - can be two dates (dates_only == True)
+        - or two datetimes (dates_only == False, unless the times are min and max, meaning all day.)
+        - or a datetime and a date (dates_only == False)
         
-        Times are voluntary, but to omit them may mean either that they are unknown, or that the event is 'all-day'.
+        Times are voluntary, but to omit both may mean either that they are unknown, or that the event is 'all-day'.
         If you care about the difference, explicitly indicate an 'all-day' event by using time.min and time.max in the time fields.
-        
+        (apart from setting all_day == True here, eventtools makes no special distinction)
         """
         
         #passed in datetimes instead?
         if sdt is not None:
             sd = sdt.date()
-            st = sdt.time()
+            if use_start_time:
+                st = sdt.time()
         if edt is not None:
             ed = edt.date()
-            et = edt.time()
+            if use_end_time:
+                et = edt.time()
 
         if sd is None:
             raise AttributeError("Start date is required")
@@ -38,7 +40,7 @@ class SmartDateTimeSpan(object):
         self.start_date = self.sd = sd
         self.start_time = self.st = st
         self.end_date = self.ed = ed
-        self.end_time = self.et = et or st
+        self.end_time = self.et = et
         
         if self.start_datetime > self.end_datetime:
             raise AttributeError("End time is before start time")
@@ -80,6 +82,14 @@ class SmartDateTimeSpan(object):
     @property
     def dates_only(self):
         return self.all_day or (self.st is None and self.et is None)
+
+    @property
+    def datetimes_only(self):
+        return self.st is not None and self.et is not None
+        
+    @property
+    def datetime_and_date(self):
+        return self.st is not None and self.et is None
     
     @property
     def start_datetime(self):

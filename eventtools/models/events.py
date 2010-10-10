@@ -207,10 +207,12 @@ class EventBase(models.Model):
     def get_all_occurrences_if_possible(self):
         if self.get_last_day():
             return self.occurrences_between(self.first_generator.start, self.get_last_day())
+        return None
     
     def occurrences_count(self):
-        if self.get_last_day():
-            return len(self.occurrences_between(self.first_generator.start, self.get_last_day()))
+        al = self.get_all_occurrences_if_possible()
+        if al:
+            return len(list(al))
         else:
             return '&infin;'
     occurrences_count.allow_tags = True
@@ -329,14 +331,14 @@ class EventBase(models.Model):
         return period.get_occurrences()
 
     #deprecations
-    @deprecated
+    @deprecated #doesn't work super-well. Just use Occurrence instead.
     def _occurrence_model(self):
         return type(self).Occurrence
     OccurrenceModel = property(_occurrence_model)
 
     @deprecated
     def _generator_model(self):
-        return type(self).Generator
+        return type(self).OccurrenceGenerator
     GeneratorModel = property(_generator_model)
 
     @deprecated

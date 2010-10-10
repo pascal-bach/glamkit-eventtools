@@ -32,7 +32,7 @@ class OccurrenceBase(models.Model):
     unvaried_end_time = models.TimeField(_("unvaried end time"), db_index=True, null=True)
     
     # These are usually the same as the unvaried, but may not always be.
-    varied_start_date = models.DateField(_("varied start date"), blank=True, null=True, db_index=True)
+    varied_start_date = models.DateField(_("varied start date"), null=True, db_index=True)
     varied_start_time = models.TimeField(_("varied start time"), blank=True, null=True, db_index=True)
     varied_end_date = models.DateField(_("varied end date"), blank=True, db_index=True, help_text=_("if omitted, start date is assumed"))
     varied_end_time = models.TimeField(_("varied end time"), blank=True, null=True, db_index=True, help_text=_("if omitted, start time is assumed"))
