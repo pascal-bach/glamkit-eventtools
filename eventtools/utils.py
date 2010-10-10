@@ -25,8 +25,7 @@ class OccurrenceReplacer(object):
     the generated ones that are equivalent.  This class makes this easier.
     """
     def __init__(self, exceptional_occurrences):
-        lookup = [((occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end), occ) for
-            occ in exceptional_occurrences]
+        lookup = [((occ.event, occ.unvaried_timespan), occ) for occ in exceptional_occurrences]
         self.lookup = dict(lookup)
 
     def get_occurrence(self, occ):
@@ -34,12 +33,10 @@ class OccurrenceReplacer(object):
         Return a exceptional occurrences set matching the occ and remove it from lookup since it
         has already been matched
         """
-        return self.lookup.pop(
-            (occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end),
-            occ)
+        return self.lookup.pop((occ.event, occ.unvaried_timespan), occ)
 
     def has_occurrence(self, occ):
-        return (occ.generator.event, occ.unvaried_timespan.start, occ.unvaried_timespan.end) in self.lookup
+        return (occ.generator.event, occ.unvaried_timespan) in self.lookup.keys()
 
     def get_additional_occurrences(self, start_dt, end_dt):
         """
@@ -48,7 +45,7 @@ class OccurrenceReplacer(object):
         for key, occ in self.lookup.items():
             # omitted and occ.timespan.end_datetime >= start_dt - unneccessary.
             # other reasons, except cancelled, to omit?
-            if (occ.timespan.start_datetime >= start_dt and occ.timespan.start_datetime < end_dt and not occ.cancelled):
+            if (occ.timespan.start_datetime >= start_dt and occ.timespan.start_datetime <= end_dt and not occ.cancelled):
                 yield occ
 
 class check_event_permissions(object):

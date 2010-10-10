@@ -51,6 +51,9 @@ class SmartDateTimeSpan(object):
     def __repr__(self):
         return self.robot_description()
 
+    def __hash__(self):
+        return hash(self.sd) + hash(self.ed) + hash(self.st) + hash(self.et)
+
     def __cmp__(self, other):
         
         #if the dates are different, return those
@@ -67,13 +70,27 @@ class SmartDateTimeSpan(object):
             if other.dates_only:
                 return 1 #put other first if self has times
             else:
-                return cmp(self.st, other.st) or cmp(self.et, other.et)
-            
+                tc = cmp(self.st, other.st) 
+                if tc != 0:
+                    if self.et is None:
+                        return -1
+                    if other.et is None:
+                        return 1
+                    return cmp(self.et, other.et)
+                return tc
+                
     def __eq__(self, other):
         return self.sd == other.sd and \
             self.st == other.st and \
-            ((self.ed == other.ed) or (self.ed is None and other.ed == self.sd) or (other.ed is None and self.ed == other.sd)) and \
+            self.ed == other.ed and \
             self.et == other.et
+
+    def __ne__(self, other):
+        return self.sd != other.sd or \
+            self.st != other.st or \
+            self.ed != other.ed or \
+            self.et != other.et
+
     
     @property
     def all_day(self):

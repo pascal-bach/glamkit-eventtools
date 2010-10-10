@@ -18,7 +18,7 @@ def occurrences(request, id, modeladmin):
     occurrences = event.get_all_occurrences_if_possible()
     if not occurrences:
         generators = event.generators.all()
-        first = event.get_first_occurrence().start
+        first = event.get_first_occurrence().timespan.start_datetime
         last = event.get_last_day()
         
         if 'year' in request.GET and 'month' in request.GET:
@@ -43,17 +43,12 @@ def occurrences(request, id, modeladmin):
     return render_to_response('admin/eventtools/list_occurrences.html', {"event": event, 'occurrences': occurrences, 'period': period, 'hasprev': hasprev, 'hasnext': hasnext, 'title': title, 'occ_change_url': occ_change_url, 'opts': EventModel._meta }, context_instance=RequestContext(request))
 
 def make_exceptional_occurrence(request, event_id, gen_id, year, month, day, hour, minute, second, modeladmin):
-    
-    
     EventModel = modeladmin.model  
     event = EventModel.objects.get(pk=int(event_id))
-        
-    # import pdb; pdb.set_trace()
-    generator = get_object_or_404(event.GeneratorModel, id=int(gen_id))
+    generator = get_object_or_404(event.GeneratorModel, pk=int(gen_id))
     occurrence = generator.get_occurrence(datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second)))
-
     occurrence.save()
-    OccurrenceModel = occurrence.__class__
+    OccurrenceModel = type(occurrence)
     admin_url_name = ('admin:%s_%s_change' % (OccurrenceModel._meta.app_label, OccurrenceModel.__name__)).lower()
     event_change_url = urlresolvers.reverse(admin_url_name, args=(occurrence.id,))
     return HttpResponseRedirect(event_change_url)

@@ -61,7 +61,7 @@ class OccurrenceGeneratorManager(models.Manager):
         
         occurrences = []
         for generator in potential_occurrence_generators:
-            occurrences += generator.get_occurrences(start, end, hide_hidden)
+            occurrences += generator.occurrences_between(start, end, hide_hidden)
         
         #In case you are pondering returning a queryset, remember that potentially occurrences are not in the database, so no such QS exists.
         
@@ -117,62 +117,43 @@ class OccurrenceGeneratorBase(models.Model):
                 # something has changed, so let's figure out the timeshifts for the generator
                 start_shift = self.timespan.start_datetime - saved_self.timespan.start_datetime
                 end_shift = self.timespan.end_datetime - saved_self.timespan.end_datetime
-                
-                added_times = saved_self.timespan.dates_only and not self.timespan.dates_only
-                removed_times = self.timespan.dates_only and not saved_self.timespan.dates_only
-            
-                if kwargs.has_key('test'):
-                    # import pdb; pdb.set_trace()
-                    del kwargs['test']
-            
+                # now we know what to add or not, BUT! we may have added or removed times simultaneously.                
+                added_start_time = saved_self.timespan.st is None and self.timespan.st is not None
+                added_end_time = saved_self.timespan.et is None and self.timespan.et is not None
+                removed_start_time = self.timespan.st is None and saved_self.timespan.st is not None
+                removed_end_time = self.timespan.et is None and saved_self.timespan.et is not None
+                                  
                 for occ in self.occurrences.all(): # only persisted occurrences of course
-                    # If the occurrence has been moved from the generated times, we don't want to change anything
-                    # however, if it hasn't been moved (and only persists because of an EventVariation or cancellation)
-                    # then we need to shift the times to match.
-                    if not occ.is_moved:
-                        varied_start = occ.varied_timespan.start_datetime + start_shift
-                        varied_end = occ.varied_timespan.end_datetime + end_shift
-                        if occ.varied_timespan.dates_only: #we have to be careful about whether we end up with a date or a datetime
-                            occ.varied_start_date = varied_start.date()                            
-                            occ.varied_end_date = varied_end.date()
-                            if added_times:
-                                occ.varied_start_time = varied_start.time()
-                                occ.varied_end_time = varied_end.time()
-                            else:
-                                occ.varied_start_time = None
-                                occ.varied_end_time = None                                
-                        else: # the results are going to be datetimes
-                            occ.varied_start_date = varied_start.date()
-                            occ.varied_end_date = varied_end.date()
-                            if removed_times:
-                                occ.varied_start_time = None
-                                occ.varied_end_time = None                                
-                            else:
-                                occ.varied_start_time = varied_start.time()
-                                occ.varied_end_time = varied_end.time()
-
+                    # # If the occurrence has been moved from the generated times, we don't want to change anything
+                    # (assuming the change represents the best info). However, if it hasn't been moved (so only
+                    # persists because of an EventVariation or cancellation), then we need to shift the times to
+                    # match.
+                    if not occ.is_moved: #have to check now, because occ will be moved anyway after the next bit
+                        copy_to_varied = True
+                    else:
+                        copy_to_varied = False                        
                     # and then apply the new 'unvaried' times
                     unvaried_start = occ.unvaried_timespan.start_datetime + start_shift
                     unvaried_end = occ.unvaried_timespan.end_datetime + end_shift
-                    if occ.unvaried_timespan.dates_only: #we have to be careful about whether we end up with a date or a datetime
-                        occ.unvaried_start_date = unvaried_start.date()                            
-                        occ.unvaried_end_date = unvaried_end.date()
-                        if added_times:
-                            occ.unvaried_start_time = unvaried_start.time()
-                            occ.unvaried_end_time = unvaried_end.time()
-                        else:
-                            occ.unvaried_start_time = None
-                            occ.unvaried_end_time = None                                
-                    else: # the results are going to be datetimes
-                        occ.unvaried_start_date = unvaried_start.date()
-                        occ.unvaried_end_date = unvaried_end.date()
-                        if removed_times:
-                            occ.unvaried_start_time = None
-                            occ.unvaried_end_time = None                                
-                        else:
-                            occ.unvaried_start_time = unvaried_start.time()
-                            occ.unvaried_end_time = unvaried_end.time()
-
+                    no_start_time = occ.unvaried_timespan.start_time is None
+                    no_end_time = occ.unvaried_timespan.end_time is None
+                    occ.unvaried_start_date = unvaried_start.date()                            
+                    occ.unvaried_end_date = unvaried_end.date()
+                    if (no_start_time and not added_start_time) or removed_start_time:
+                        occ.unvaried_start_time = None
+                    else:
+                        occ.unvaried_start_time = unvaried_start.time()
+                    if (no_end_time and not added_end_time) or removed_end_time:
+                        occ.unvaried_end_time = None
+                    else:
+                        occ.unvaried_end_time = unvaried_end.time() 
+                        
+                    if copy_to_varied:
+                        occ.varied_start_date = occ.unvaried_start_date
+                        occ.varied_start_time = occ.unvaried_start_time
+                        occ.varied_end_date = occ.unvaried_end_date
+                        occ.varied_end_time = occ.unvaried_end_time
+                       
                     occ.save()
         super(OccurrenceGeneratorBase, self).save(*args, **kwargs)
     
@@ -216,8 +197,8 @@ class OccurrenceGeneratorBase(models.Model):
             return self.timespan.robot_description()
         
     def _occurrence_model(self):
-        return models.get_model(self._meta.app_label, self._occurrence_model_name)
-    OccurrenceModel = property(_occurrence_model)
+        return self.event.Occurrence
+    Occurrence = OccurrenceModel = property(_occurrence_model)
 
     def _create_occurrence(self, unvaried_timespan, varied_timespan=None):
         occ = self.OccurrenceModel(generator=self, unvaried_timespan=unvaried_timespan, varied_timespan=varied_timespan )
@@ -228,7 +209,7 @@ class OccurrenceGeneratorBase(models.Model):
         """
         generates a list of *unexceptional* Occurrences for this event between two datetimes, start and end.
         """
-        
+                
         event_duration = self.timespan.duration() #a timedelta
         if self.rule is not None:
             occurrences = []
@@ -270,8 +251,7 @@ class OccurrenceGeneratorBase(models.Model):
             if o_end > after:
                 yield self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=o_start, edt=o_end))
     
-    #check
-    def get_occurrences(self, start, end=None, hide_hidden=True):
+    def occurrences_between(self, start, end=None, hide_hidden=True):
         """
         returns a list of occurrences between the datetimes ``start`` and ``end``.
         Includes all of the exceptional Occurrences.
@@ -287,21 +267,18 @@ class OccurrenceGeneratorBase(models.Model):
         occurrences = self._get_occurrence_list(start, end)
         for occ in occurrences: #and why aren't we looping through exceptional_occurrences here?
             # replace occurrences with their exceptional counterparts
-            if occ_replacer.has_occurrence(occ):
-                p_occ = occ_replacer.get_occurrence(occ)
-                # ...but only if they're not (hidden and you want to hide them)
+            p_occ = occ_replacer.get_occurrence(occ)
+            # import pdb; pdb.set_trace()
+            # only yield if they are within this period
+            if p_occ.timespan.start_datetime >= start and p_occ.timespan.start_datetime <= end: #and p_occ.timespan.end_datetime >= start
+                # ...and only if they're not hidden and you want to hide them
                 if not (hide_hidden and p_occ.hide_from_lists):
-                    # ...and only if they are within this period
-                    if p_occ.timespan.start_datetime >= start and p_occ.timespan.start_datetime < end and p_occ.timespan.end_datetime >= start:
-                        yield p_occ
-            else:
-              yield occ
+                    yield p_occ
         # then add exceptional occurrences which originated outside of this period but now
         # fall within it
         additional = occ_replacer.get_additional_occurrences(start, end)
         yield additional.next()
-    occurrences_between = get_occurrences
-    
+    get_occurrences = occurrences_between
             
     def get_exceptional_occurrences(self, exclude_hidden=True):
         """
@@ -377,21 +354,11 @@ class OccurrenceGeneratorBase(models.Model):
     def get_one_occurrence(self):
         return get_first_occurrence
     
-    def get_occurrence(self, date):
+    def get_occurrence(self, d):
         import warnings
-        warnings.warn("get_occurrence(d) is deprecated. Use objects.occurrences_between(d,d) instead.", DeprecationWarning, stacklevel = 2)
+        warnings.warn("get_occurrence(d) is deprecated. Use objects.occurrences_between(d,d).next() instead.", DeprecationWarning, stacklevel = 2)    
+        return self.occurrences_between(d, d).next()
         
-        rule = self.get_rrule_object()
-        if rule:
-            next_occurrence = rule.after(date, inc=True)
-        else:
-            next_occurrence = self.start
-        if next_occurrence == date:
-            try:
-                return self.OccurrenceModel.objects.get(generator__event = self, unvaried_start_date = date)
-            except self.OccurrenceModel.DoesNotExist:
-                return self._create_occurrence(unvaried_timespan = SmartDateTimeSpan(sdt=next_occurrence))
-    
     @deprecated
     def get_changed_occurrences(self):
         return self.get_exceptional_occurrences()
