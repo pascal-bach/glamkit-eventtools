@@ -231,11 +231,9 @@ class EventBase(models.Model):
         
         # also get the changed occurrences
         for gen in self.generators.all():
-            occs += gen.get_changed_occurrences()
+            occs += gen.get_changed_occurrences() #wouldn't this always contain variation occurrences?
         
         return list(set(sorted(occs + variation_occs)))
-    
-    
     
     def get_last_occurrence_end(self):
         lastdays = []
@@ -260,7 +258,6 @@ class EventBase(models.Model):
             return True
         return False
 
-
     def edit_occurrences_link(self):
         """ An admin link """
         # if self.has_multiple_occurrences:
@@ -275,7 +272,7 @@ class EventBase(models.Model):
         """
         returns the number of variations that this event has
         """
-        if self.__class__.varied_by:
+        if hasattr(type(self), 'varied_by'):
             try:
                 return self.variations.count()
             except: # if none have been created, there is no such thing as self.variations, so return 0
@@ -341,6 +338,6 @@ class EventBase(models.Model):
         return type(self).OccurrenceGenerator
     GeneratorModel = property(_generator_model)
 
-    @deprecated
+    @deprecated #badly named
     def get_last_day(self):
         return self.get_last_occurrence_end()
