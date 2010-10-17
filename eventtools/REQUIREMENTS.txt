@@ -1,0 +1,5 @@
+-e git+http://github.com/matthiask/django-mptt.git#egg=mptt
+python-dateutil
+
+#optionally
+feincms

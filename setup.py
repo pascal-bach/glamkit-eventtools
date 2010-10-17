@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
  
 setup(
     name='glamkit-eventtools',
-    version='0.9.0',
+    version='2.0.0a1',
     description='An event management app for Django.',
     author='Thomas Ashelford',
     author_email='thomas@interaction.net.au',

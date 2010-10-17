@@ -1,41 +1,28 @@
-from eventtools.models import EventBase, EventVariationBase
 from django.db import models
-from django.utils.translation import ugettext, ugettext_lazy as _
+from eventtools.models import EventModel, OccurrenceModel
+from django.conf import settings
 
-class TestEvent(EventBase):
-    title = models.CharField(_("Title"), max_length = 255)
-    # for django_schedule tests
+class Venue(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
 
-class LectureEvent(EventBase):
-    title = models.CharField(_("Title"), max_length = 255)
-    lecturer = models.TextField(max_length=100)
-    location = models.TextField(max_length=100)
-    wheelchair_access = models.BooleanField(default=True)
-    varied_by = "LectureEventVariation"
-
-class LectureEventVariation(EventVariationBase):
-    #Usually nothing should be compulsory in a variation (but you never know)
-    title = models.CharField(max_length=100, blank=True, null=True)
-    location = models.TextField(max_length=100, blank=True, null=True)
-    wheelchair_access = models.NullBooleanField() #implied default == None
-    varies = "LectureEvent"
-
-class BroadcastEvent(EventBase):
-    presenter = models.TextField(max_length=100)
-    studio = models.IntegerField()
-    varied_by = "BroadcastEventVariation"
-            
-class BroadcastEventVariation(EventVariationBase):
-    varies = "BroadcastEvent"
-    presenter = models.TextField(max_length=100, blank=True, null=True)
-        
-class LessonEvent(EventBase):
-    subject = models.TextField(max_length=100)
-    #Test that an event can work without variations defined
-    
-class CampEvent(EventBase):
-    name = models.TextField(max_length=100)
-    tent_required = models.BooleanField()
+class Event(EventModel):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, default="the-slug")
+    venue = models.ForeignKey(Venue, null=True, blank=True)            
+    difference_from_parent = models.CharField(max_length=250, blank=True, null=True)
     
     def __unicode__(self):
+        if self.difference_from_parent and self.parent:
+            return "%s (%s)" % (self.name, self.difference_from_parent)
         return self.name
+        
+    class EventMeta:
+        fields_to_inherit = ['name', 'slug', 'venue']
+        
+class Occurrence(OccurrenceModel):
+    event = models.ForeignKey(Event, related_name="occurrences")
+    status = models.CharField(max_length=20, blank=True, null=True, choices=settings.OCCURRENCE_STATUS_CHOICES)
+    
+    # def __unicode__(self):
+    #     return "%s (%s)" % (self.event, self.annotation)

@@ -1,0 +1,24 @@
+Install the requirements (using pip).
+
+Add mptt and eventtools to INSTALLED_APPS
+
+Make a new events app and add it to INSTALLED_APPS.
+
+Add 'moderation' to INSTALLED_APPS
+
+In your new app:
+
+    Define a model that subclasses models.EventModel.
+    
+    In EventMeta, define the fields that you want to be automatically inherited by children (children_inherit)
+
+    Define a model that subclasses models.OccurrenceModel, and give it a FK to the 1st model called 'event' that has a related name 'occurrences'
+
+    Set up admin:
+        Event registered with EventAdmin
+
+Feincms option
+--------------
+Install feincms (add to INSTALLED_APPS)
+
+Event registered with FeinCMSEventAdmin
