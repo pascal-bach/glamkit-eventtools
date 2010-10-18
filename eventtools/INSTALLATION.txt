@@ -1,20 +1,34 @@
-Install the requirements (using pip).
+0. Install the requirements (using pip).
 
-Add mptt and eventtools to INSTALLED_APPS
+    pip install -e REQUIREMENTS.txt
 
-Make a new events app and add it to INSTALLED_APPS.
+1. List the required applications in the ``INSTALLED_APPS`` portion of your settings
+   file.  Your settings file might look something like::
+   
+       INSTALLED_APPS = (
+           # ...
+           'mptt'
+           'eventtools',
+           'events',
+       )
 
-Add 'moderation' to INSTALLED_APPS
+2. Install the pagination middleware.  Your settings file might look something
+   like::
+   
+       MIDDLEWARE_CLASSES = (
+           # ...
+           'pagination.middleware.PaginationMiddleware',
+       )
 
-In your new app:
+3. Define models. In your new app:
 
-    Define a model that subclasses models.EventModel.
+    * Define a model that subclasses models.EventModel.
     
-    In EventMeta, define the fields that you want to be automatically inherited by children (children_inherit)
+    * In EventMeta, define the fields that you want to be automatically inherited by children (children_inherit)
 
-    Define a model that subclasses models.OccurrenceModel, and give it a FK to the 1st model called 'event' that has a related name 'occurrences'
+    * Define a model that subclasses models.OccurrenceModel. Give it a FK to the 1st model called 'event' that has a related name 'occurrences'
 
-    Set up admin:
+4. Set up admin:
         Event registered with EventAdmin
 
 Feincms option
@@ -22,3 +36,5 @@ Feincms option
 Install feincms (add to INSTALLED_APPS)
 
 Event registered with FeinCMSEventAdmin
+
+...

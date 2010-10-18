@@ -30,7 +30,7 @@ def fixture(self):
     # deleting the 2nd jan, because we want to test it isn't displayed
     self.daily_tour = Event.objects.create(name="Daily Tour", slug="daily-tour")
     for day in range(50):
-        if day !=2:
+        if day !=1: #2nd of month.
             d = date(2010,1,1) + timedelta(day)
             self.daily_tour.occurrences.create(start=d)
 
@@ -38,7 +38,7 @@ def fixture(self):
     self.weekly_talk = Event.objects.create(name="Weekly Talk", slug="weekly-talk")
     for day in range(50):
         d = date(2010,1,1) + timedelta(day*7)
-        self.daily_tour.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
+        self.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
 
 
     #an event with some variations

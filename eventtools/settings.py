@@ -11,3 +11,5 @@ EVENT_GET_MAP = {
     'startdate': 'startdate',
     'enddate': 'enddate',
 }
+
+OCCURRENCES_PER_PAGE = 20

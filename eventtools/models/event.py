@@ -111,7 +111,7 @@ class EventQuerySet(models.query.QuerySet):
         
     def highest_having_occurrences(self):
         """
-        the highest objects that have occurrences meet these two conditions:
+        the highest objects that have occurrences meet these conditions:
             a) they have occurrences
             b) none of their ancestors have occurrences
         

@@ -1,0 +1,43 @@
+{% extends "_base.html" %}
+{% load get_string %}
+
+{% block content %}
+
+	{% regroup occurrence_page by start_date as day_list %}
+	
+	<ul class="days">
+		{% for day in day_list %}
+			<li class="day">
+				<h2>{{ day.grouper|date:"l, j F Y" }}</h2>
+				<ul class="occurrences">
+					{% for occurrence in day.list %}
+						<li class="event">
+							{% include "eventtools/_occurrence_in_list.html" %}
+						</li>
+					{% endfor %}
+				<ul>
+			</li>
+		{% empty %}
+		<li>Sorry, no events were found</li>
+		{% endfor %}
+	</ul>
+
+	<div class="pagination">
+		{% block pagination %}
+			<span class="step-links">
+					{% if occurrence_pageinfo.has_previous %}
+							<a href="?{% get_string 'page' occurrence_pageinfo.previous_page_number %}">Earlier</a>
+					{% endif %}
+
+					<span class="current">
+							Showing {{ occurrence_pageinfo.start_index }}&ndash;{{ occurrence_pageinfo.end_index }} of {{ occurrence_pageinfo.paginator.count }}.
+					</span>
+
+					{% if occurrence_pageinfo.has_next %}
+							<a href="?{% get_string 'page' occurrence_pageinfo.next_page_number %}">Later</a>
+					{% endif %}
+			</span>
+		{% endblock pagination %}
+	</div>
+
+{% endblock %}

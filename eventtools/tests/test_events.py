@@ -180,7 +180,7 @@ class TestEvents(AppTestCase):
         """
         
         o = Event.objects.opening_before(self.day1)
-        self.ae(list(o), [self.talk, self.performance, self.daily_tour, self.film])
+        self.ae(list(o), [self.talk, self.performance, self.daily_tour, self.weekly_talk, self.film])
         o = Event.objects.opening_after(self.day1)
         self.ae(list(o), [self.talk, self.performance, self.film, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
         o = Event.objects.opening_between(self.day1, self.day2)
@@ -191,9 +191,9 @@ class TestEvents(AppTestCase):
         self.ae(list(o), [self.film_with_popcorn])
         
         c = Event.objects.closing_before(self.day2)
-        self.ae(list(c), [self.talk, self.film, self.film_with_popcorn])
+        self.ae(list(c), [self.talk, self.daily_tour, self.film, self.film_with_popcorn])
         c = Event.objects.closing_after(self.day2)
-        self.ae(list(c), [self.talk, self.performance, self.daily_tour, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
+        self.ae(list(c), [self.talk, self.performance, self.weekly_talk, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
         c = Event.objects.closing_between(self.day1, self.day2)
         self.ae(list(c), [self.talk, self.film, self.film_with_popcorn])
         c = Event.objects.closing_on(self.day2)
@@ -205,11 +205,12 @@ class TestEvents(AppTestCase):
         """        
         a (GET) dictionary, containing date(time) from and to parameters can be passed.
            Event.objects.filter(venue=the_library, cancelled=True).occurrences_from_GET_params(request.GET, 'from', 'to')
+        This returns a tuple of the parsed dates, too.
         """
-        self.ae(list(Occurrence.objects.from_GET()), list(Occurrence.objects.forthcoming()))        
-        self.ae(list(Occurrence.objects.from_GET({'startdate': '2010-10-10'})), list(Occurrence.objects.after(self.day1)))
-        self.ae(list(Occurrence.objects.from_GET({'enddate': '2010-10-11'})), list(Occurrence.objects.before(self.day2)))
-        self.ae(list(Occurrence.objects.from_GET({'startdate': '2010-10-10', 'enddate': '2010-10-11'})), list(Occurrence.objects.between(self.day1, self.day2)))
+        self.ae(list(Occurrence.objects.from_GET()[0]), list(Occurrence.objects.forthcoming()))        
+        self.ae(list(Occurrence.objects.from_GET({'startdate': '2010-10-10'})[0]), list(Occurrence.objects.after(self.day1)))
+        self.ae(list(Occurrence.objects.from_GET({'enddate': '2010-10-11'})[0]), list(Occurrence.objects.before(self.day2).reverse()))
+        self.ae(list(Occurrence.objects.from_GET({'startdate': '2010-10-10', 'enddate': '2010-10-11'})[0]), list(Occurrence.objects.between(self.day1, self.day2)))
     
     def test_change_cascade(self):       
         """
@@ -348,7 +349,7 @@ class TestEvents(AppTestCase):
         #a useful derivative
         highest_having_occurrences = tree.highest_having_occurrences()
         self.assertEqual(list(highest_having_occurrences), [self.has_some_occurrences])
-        
+                
     def test_event_family(self):
         """
         Utils:

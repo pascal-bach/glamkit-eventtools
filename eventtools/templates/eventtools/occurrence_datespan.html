@@ -1,0 +1,14 @@
+{% extends "eventtools/occurrence_list.html" %}
+{% load get_string %}
+
+{% block pagination %}
+	<span class="step-links">
+			<a href="?{% get_string 'startdate' occurrence_pageinfo.previous_date_span.start 'enddate' occurrence_pageinfo.previous_date_span.end %}">Earlier</a>
+
+			<span class="current">
+					Showing {{ occurrence_pageinfo.date_span }}.
+			</span>
+
+			<a href="?{% get_string 'startdate' occurrence_pageinfo.next_date_span.start 'enddate' occurrence_pageinfo.next_date_span.end %}">Later</a>
+	</span>
+{% endblock %}

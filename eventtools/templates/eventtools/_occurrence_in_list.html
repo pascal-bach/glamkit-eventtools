@@ -1,0 +1,2 @@
+<h3><a href="{% url occurrence occurrence.event.slug occurrence.id %}">{{ occurrence.event }}</a></h3>
+{% if not occurrence.all_day %}<p>{{ occurrence.html_time_description }}</p>{% endif %}

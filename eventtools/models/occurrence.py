@@ -3,11 +3,14 @@ from eventtools.utils import datetimeify, dayify
 from datetime import date, time, datetime
 from eventtools.conf import settings
 from eventtools.utils import dateranges
-from eventtools.utils.pprint_timespan import pprint_datetime_span
+from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 
 from dateutil import parser as dateparser
 from django.core.exceptions import ValidationError
 from dateutil.relativedelta import relativedelta
+
+from django.utils.safestring import mark_safe
+
 
 class OccurrenceQuerySetFN(object):
     """
@@ -309,14 +312,14 @@ class OccurrenceQuerySetFN(object):
 
         if fr is None:
             if to is None:
-                return self.forthcoming()
+                return self.forthcoming(), (fr, to)
             else:
-                return self.before(to)
+                return self.before(to).reverse(), (fr, to) #bleh, results unlikely to be authentic. First person to use this fix it up.
         else:
             if to is None:
-                return self.after(fr)
+                return self.after(fr), (fr, to)
             else:
-                return self.between(fr, to)
+                return self.between(fr, to), (fr, to)
                 
         
 class OccurrenceQuerySet(models.query.QuerySet, OccurrenceQuerySetFN):
@@ -393,10 +396,39 @@ class OccurrenceModel(models.Model):
         
     def relative_duration(self):
         return relativedelta(self.end, self.start)
+
+    def all_day(self):
+        return self.start.time() == time.min and self.end.time() == time.max
     
-    def timespan_description(self):
-        return pprint_datetime_span(self.start, self.end)
+    def timespan_description(self, html=False):
+        if html:
+            return mark_safe(pprint_datetime_span(self.start, self.end,
+                infer_all_day=False,
+                space="&nbsp;", 
+                date_range_str="&ndash;", 
+                time_range_str="&ndash;", 
+                separator=":", 
+                grand_range_str="&nbsp;&ndash;&nbsp;", 
+            ))
+        return mark_safe(pprint_datetime_span(self.start, self.end, infer_all_day=False))
+
+    def html_timespan(self):
+        return self.timespan_description(html=True)
         
+    def time_description(self, html=False):
+        t1 = self.start.time()
+        if self.start.date() == self.end.date():
+            t2 = self.end.time()
+        else:
+            t2 = t1
+        
+        if html:
+            return mark_safe(pprint_time_span(t1, t2, range_str="&ndash;"))
+        return pprint_time_span(t1, t2)
+        
+    def html_time_description(self):
+        return self.time_description(html=True)
+
     @property
     def has_finished(self):
         return self.end < datetime.now()
@@ -432,4 +464,6 @@ class OccurrenceModel(models.Model):
         if self.has_finished:
             return relativedelta(self.end, datetime.now())
         return None
-                
+
+    def start_date(self):
+        return self.start.date()
