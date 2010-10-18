@@ -90,7 +90,9 @@ class TestEvents(AppTestCase):
         """
         You can query occurrences for an event queryset, including by date range etc.
         
-        TODO: start queries are covered; ends and entirely queries are not.
+        TODO: start queries are covered in tests; ends and entirely queries are not.
+        
+        You can get the opening and closing occurrence for an event:
         
         """
         all_occs = Event.objects.occurrences()
@@ -111,7 +113,12 @@ class TestEvents(AppTestCase):
         # just checking a queryset is returned and can be further refined
         gallery_occs = Event.objects.filter(venue=self.gallery).occurrences().after(self.day2)
         self.ae(list(gallery_occs), [self.talk_tomorrow_morning_cancelled])
+        
+        #opening and closing
+        self.ae(self.performance.opening_occurrence(), self.performance_evening)
+        self.ae(self.performance.closing_occurrence(), self.performance_day_after_tomorrow)
 
+    # The bigfixture takes ages.
     # def test_advanced_queries(self):
     #     """
     #     There are shortcut occurrence queries, which define date range relative to the current day.
@@ -173,7 +180,7 @@ class TestEvents(AppTestCase):
         """
         
         o = Event.objects.opening_before(self.day1)
-        self.ae(list(o), [self.talk, self.performance, self.film])
+        self.ae(list(o), [self.talk, self.performance, self.daily_tour, self.film])
         o = Event.objects.opening_after(self.day1)
         self.ae(list(o), [self.talk, self.performance, self.film, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
         o = Event.objects.opening_between(self.day1, self.day2)
@@ -186,7 +193,7 @@ class TestEvents(AppTestCase):
         c = Event.objects.closing_before(self.day2)
         self.ae(list(c), [self.talk, self.film, self.film_with_popcorn])
         c = Event.objects.closing_after(self.day2)
-        self.ae(list(c), [self.talk, self.performance, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
+        self.ae(list(c), [self.talk, self.performance, self.daily_tour, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
         c = Event.objects.closing_between(self.day1, self.day2)
         self.ae(list(c), [self.talk, self.film, self.film_with_popcorn])
         c = Event.objects.closing_on(self.day2)
@@ -261,7 +268,119 @@ class TestEvents(AppTestCase):
     #     self.next_new_film, created = Event.objects.get_or_create(parent=self.film, slug="new-slug")
     #     self.ae(self.next_new_film.name, self.film.name)
     #     self.ae(self.next_new_film.slug, 'new-slug')        
+
+    def test_tree_queries(self):
+        """
+        Sometimes you really do want to list of events, not occurrences, (e.g. events by tag, in alpha order).
+        The specific mechanism for this is implementation-specific, but since events are variations in a tree,
+        you might not want to show all the variations in such a list - especially not the events with no occurrences.
         
+        If you choose a rule like 'use only events with a slug (or title) different to its parent', then that is implementation-specific.
+        
+        However, if you want 
+        only the most top-level events that have occurrences,
+        or only events that have occurrences,
+        or only events without occurrences that have children with occurrences,
+        or only events without occurrences that have descendants that have occurrences,
+        or only events that differ from their parents in inherited fields,
+        or combinations of these querysets,
+        then these utilities will help.
+        
+        Fundamentally, we want to be able to run queries that return events based on properties of their relatives:
+        
+        Event.objects.with_children_having(*args, *kwargs)
+        Event.objects.with_descendants_having(*args, *kwargs)
+        Event.objects.with_parent_having(*args, *kwargs)
+        Event.objects.with_ancestors_having(*args, *kwargs)
+        Event.objects.without_children_having(*args, *kwargs)
+        Event.objects.without_descendants_having(*args, *kwargs)
+        Event.objects.without_parent_having(*args, *kwargs)
+        Event.objects.without_ancestors_having(*args, *kwargs)
+        
+        (This should go into mptt some day)
+        """
+        
+        self.has_no_occurrences = Event.objects.create(name="no occurrences")
+        self.has_some_occurrences = Event.objects.create(parent=self.has_no_occurrences, name="some occurrences")
+        self.has_some_occurrences.occurrences.create(start=date.today())
+        self.has_some_more_occurrences = Event.objects.create(parent=self.has_some_occurrences, name="more occurrences")
+        self.has_some_more_occurrences.occurrences.create(start=date.today())
+        
+        #reload!
+        self.has_no_occurrences = self.has_no_occurrences.reload()
+        self.has_some_occurrences = self.has_some_occurrences.reload() 
+        self.has_some_more_occurrences = self.has_some_more_occurrences.reload() 
+        
+        tree = self.has_no_occurrences.get_descendants(include_self=True)
+        
+        #fundamentals
+        wch = tree.with_children_having(name__contains="occurrences")
+        wdh = tree.with_descendants_having(name__contains="occurrences")
+        #include self applies to the query for 'descendants'
+        wdh2 = tree.with_descendants_having(name__contains="occurrences", include_self=False)
+        wph = tree.with_parent_having(name__contains="no")
+        wah = tree.with_ancestors_having(name__contains="no")
+        
+        woch = tree.without_children_having(name__contains="more")
+        wodh = tree.without_descendants_having(name__contains="some")
+        wodh2 = tree.without_descendants_having(name__contains="some", include_self=False)
+        woph = tree.without_parent_having(name__contains="some")
+        woah = tree.without_ancestors_having(name__contains="some")
+
+        self.assertEqual(list(wch), [self.has_no_occurrences, self.has_some_occurrences])
+        self.assertEqual(list(wdh), [self.has_no_occurrences, self.has_some_occurrences, self.has_some_more_occurrences])
+        self.assertEqual(list(wdh2), [self.has_no_occurrences, self.has_some_occurrences])
+        self.assertEqual(list(wph), [self.has_some_occurrences])
+        self.assertEqual(list(wah), [self.has_some_occurrences, self.has_some_more_occurrences])
+        
+        self.assertEqual(list(woch), [self.has_no_occurrences, self.has_some_more_occurrences])
+        self.assertEqual(list(wodh), [self.has_some_more_occurrences])
+        self.assertEqual(list(wodh2), [self.has_some_occurrences, self.has_some_more_occurrences])
+        self.assertEqual(list(woph), [self.has_no_occurrences, self.has_some_occurrences])
+        self.assertEqual(list(woah), [self.has_no_occurrences, self.has_some_occurrences])
+
+        objects_having_occurrences = tree.having_occurrences()
+        objects_having_no_occurrences = tree.having_no_occurrences()
+        
+        self.assertEqual(list(objects_having_occurrences), [self.has_some_occurrences, self.has_some_more_occurrences])
+        self.assertEqual(list(objects_having_no_occurrences), [self.has_no_occurrences])        
+        
+        #a useful derivative
+        highest_having_occurrences = tree.highest_having_occurrences()
+        self.assertEqual(list(highest_having_occurrences), [self.has_some_occurrences])
+        
+    def test_event_family(self):
+        """
+        Utils:
+        
+        Given an event, get all the events that are descendant. Optionally exclude self.        
+        Given an event, get all the events that are either descendants or ancestors. Optionally exclude self.        
+        Given an event, get occurrences for all descendants. Optionally exclude self.
+        Given an event, get occurrences for all descendants and ancestors. Optionally exclude self.
+        (Inclusion of self by default is different to mptt)       
+        """
+        
+        #descendants (this is an mptt function)
+        self.ae(list(self.film.get_descendants()), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn])
+        self.ae(list(self.film_with_talk.get_descendants()), [self.film_with_talk, self.film_with_talk_and_popcorn])
+        self.ae(list(self.film_with_talk.get_descendants(include_self=False)), [self.film_with_talk_and_popcorn])
+        
+        #family (descendants + ancestors)
+        self.ae(list(self.film_with_talk.get_family()), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn])
+        self.ae(list(self.film_with_talk.get_family(include_self=False)), [self.film, self.film_with_talk_and_popcorn])
+
+        # occurrence versions
+        self.ae(list(self.film.get_descendants().occurrences()), [self.film_occ, self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film.get_descendants(include_self=False).occurrences()), [self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film.get_family().occurrences()), [self.film_occ, self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film.get_family(include_self=False).occurrences()), [self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+
+        self.ae(list(self.film_with_talk.get_descendants().occurrences()), [self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film_with_talk.get_descendants(include_self=False).occurrences()), [self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film_with_talk.get_family().occurrences()), [self.film_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film_with_talk.get_family(include_self=False).occurrences()), [self.film_occ, self.film_with_talk_and_popcorn_occ])
+        
+
     def test_diffs(self):
         self.ae(unicode(self.film), u'Film Night')
         self.ae(unicode(self.film_with_talk), u'Film Night (director\'s talk)')

@@ -15,6 +15,8 @@ class TestCaseWithApp(TestCase):
 
         self.old_INSTALLED_APPS = settings.INSTALLED_APPS
         settings.INSTALLED_APPS += [APP_NAME]
+        self._old_root_urlconf = settings.ROOT_URLCONF
+        settings.ROOT_URLCONF = '%s.urls' % APP_NAME
         load_app(APP_NAME)
         call_command('flush', verbosity=0, interactive=False)
         call_command('syncdb', verbosity=0, interactive=False)
@@ -23,3 +25,4 @@ class TestCaseWithApp(TestCase):
         
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_INSTALLED_APPS
+        settings.ROOT_URLCONF = self._old_root_urlconf

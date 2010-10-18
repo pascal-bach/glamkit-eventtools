@@ -3,13 +3,19 @@ from django.db.models.base import ModelBase
 from mptt.models import MPTTModel, MPTTModelBase
 from django.db.models.fields import FieldDoesNotExist
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault
+from django.db.models import Count
 
 class EventQuerySet(models.query.QuerySet):
     def occurrences(self, *args, **kwargs):
         return self.model.Occurrence().objects.filter(event__in=self).filter(*args, **kwargs)
     
     def opening_occurrences(self):
-        pks = [e.occurrences.all()[0].pk for e in self]
+        pks = []
+        for e in self:
+            try:
+                pks.append(e.opening_occurrence().id)
+            except AttributeError:
+                pass
         return self.occurrences(pk__in=pks)
         
     def opening_before(self, date):
@@ -22,8 +28,12 @@ class EventQuerySet(models.query.QuerySet):
         return self.opening_occurrences().on(date).events()
 
     def closing_occurrences(self):
-        # pks = [e.occurrences.all().order_by('-start')[0].pk for e in self]
-        pks = [e.occurrences.all().reverse()[0].pk for e in self]
+        pks = []
+        for e in self:
+            try:
+                pks.append(e.closing_occurrence().id)
+            except AttributeError:
+                pass
         return self.occurrences(pk__in=pks)
         
     def closing_before(self, date):
@@ -34,6 +44,84 @@ class EventQuerySet(models.query.QuerySet):
         return self.closing_occurrences().between(d1, d2).events()
     def closing_on(self, date):
         return self.closing_occurrences().on(date).events()
+
+    def _with_relatives_having(self, relatives_fn, *args, **kwargs):
+        """
+        Return the set of items in self that have relatives matching a particular criteria.
+        """
+        match_ids = set()
+        for obj in self:
+            matches = relatives_fn(obj)
+            if matches.count(): #weird bug where filter returns results on an empty qs!
+                matches = matches.filter(*args, **kwargs)
+                if matches.count():
+                    match_ids.add(obj.id)
+        return self.filter(id__in=match_ids)
+
+    def with_children_having(self, *args, **kwargs):
+        return self._with_relatives_having(lambda x: x.get_children(), *args, **kwargs)
+        
+    def with_descendants_having(self, *args, **kwargs):
+        include_self = kwargs.pop('include_self', True)
+        return self._with_relatives_having(lambda x: x.get_descendants(include_self=include_self), *args, **kwargs)
+
+    def with_parent_having(self, *args, **kwargs):
+        return self._with_relatives_having(lambda x: self.filter(id=x.parent_id), *args, **kwargs)
+
+    def with_ancestors_having(self, *args, **kwargs):
+        return self._with_relatives_having(lambda x: x.get_ancestors(), *args, **kwargs)
+
+    def _without_relatives_having(self, relatives_fn, *args, **kwargs):
+        """
+        Return the set of items in self that have 0 relatives matching a particular criteria.
+        """
+        match_ids = set()
+        for obj in self:
+            matches = relatives_fn(obj)
+            if matches.count(): #weird bug where filter returns results on an empty qs!
+                matches = matches.filter(*args, **kwargs)
+                if matches.count() == 0:
+                    match_ids.add(obj.id)
+            else: #no relatives => win
+                    match_ids.add(obj.id)                
+        return self.filter(id__in=match_ids)
+        
+    def without_children_having(self, *args, **kwargs):
+        return self._without_relatives_having(lambda x: x.get_children(), *args, **kwargs)
+
+    def without_descendants_having(self, *args, **kwargs):
+        include_self = kwargs.pop('include_self', True)
+        return self._without_relatives_having(lambda x: x.get_descendants(include_self=include_self), *args, **kwargs)
+
+    def without_parent_having(self, *args, **kwargs):
+        return self._without_relatives_having(lambda x: self.filter(id=x.parent_id), *args, **kwargs)
+
+    def without_ancestors_having(self, *args, **kwargs):
+        return self._without_relatives_having(lambda x: x.get_ancestors(), *args, **kwargs)
+        
+    #some simple annotations
+    def having_occurrences(self):
+        return self.annotate(num_occurrences=Count('occurrences')).filter(num_occurrences__gt=0)
+
+    def having_n_occurrences(self, n):
+        return self.annotate(num_occurrences=Count('occurrences')).filter(num_occurrences=n)
+
+    def having_no_occurrences(self):
+        return self.having_n_occurrences(0)
+        
+    def highest_having_occurrences(self):
+        """
+        the highest objects that have occurrences meet these two conditions:
+            a) they have occurrences
+            b) none of their ancestors have occurrences
+        
+        This is a good first blush at 'The List Of Events', since it is the longest list of events whose descendants'
+        occurrences will cover the entire set of occurrences with no repetitions.
+        """
+        return self.having_occurrences()._without_relatives_having(
+            lambda x: x.get_ancestors().annotate(num_occurrences=Count('occurrences')),
+            num_occurrences__gt=0
+        )
 
 
 class EventManager(models.Manager):
@@ -59,6 +147,30 @@ class EventManager(models.Manager):
         return self.get_query_set().closing_between(*args, **kwargs)
     def closing_on(self, *args, **kwargs):
         return self.get_query_set().closing_on(*args, **kwargs)        
+    def with_children_having(self, *args, **kwargs):
+        return self.get_query_set().with_children_having(*args, **kwargs)        
+    def with_descendants_having(self, *args, **kwargs):
+        return self.get_query_set().with_descendants_having(*args, **kwargs)        
+    def with_parent_having(self, *args, **kwargs):
+        return self.get_query_set().with_parent_having(*args, **kwargs)        
+    def with_ancestors_having(self, *args, **kwargs):
+        return self.get_query_set().with_ancestors_having(*args, **kwargs)        
+    def without_children_having(self, *args, **kwargs):
+        return self.get_query_set().without_children_having(*args, **kwargs)        
+    def without_descendants_having(self, *args, **kwargs):
+        return self.get_query_set().without_descendants_having(*args, **kwargs)        
+    def without_parent_having(self, *args, **kwargs):
+        return self.get_query_set().without_parent_having(*args, **kwargs)        
+    def without_ancestors_having(self, *args, **kwargs):
+        return self.get_query_set().without_ancestors_having(*args, **kwargs)        
+    def having_occurrences(self):
+        return self.get_query_set().having_occurrences()        
+    def having_n_occurrences(self, n):
+        return self.get_query_set().having_n_occurrences(n)        
+    def having_no_occurrences(self):
+        return self.get_query_set().having_no_occurrences()        
+    def highest_having_occurrences(self):
+        return self.get_query_set().highest_having_occurrences()        
             
 class EventOptions(object):
     """
@@ -157,3 +269,28 @@ class EventModel(MPTTModel):
                     except AttributeError:
                         continue
                 child.save() #cascades to grandchildren
+                
+    def has_occurrences(self):
+        return self.occurrences.count()
+        
+    def opening_occurrence(self):
+        try:
+            return self.occurrences.all()[0]
+        except IndexError:
+            return None
+        
+    def closing_occurrence(self):
+        try:
+            return self.occurrences.all().reverse()[0]
+        except IndexError:
+            return None
+
+    def get_descendants(self, include_self=True):
+        descendantsqs = super(EventModel, self).get_descendants(include_self=include_self)
+        # it's a django QuerySet, so we need to recast it as an EventQuerySet to call occurrences() on it.
+        return descendantsqs._clone(klass=EventQuerySet)
+
+    def get_family(self, include_self=True):
+        familyqs = self.get_ancestors() | super(EventModel, self).get_descendants(include_self=include_self)
+        # it's a django QuerySet, so we need to recast it as an EventQuerySet to call occurrences() on it.
+        return familyqs._clone(klass=EventQuerySet)
