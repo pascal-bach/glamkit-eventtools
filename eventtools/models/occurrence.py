@@ -382,7 +382,7 @@ class OccurrenceModel(models.Model):
         super(OccurrenceModel, self).save(*args, **kwargs)
         
     def __unicode__(self):
-        return "%s (id %s, starting %s)" % (self.event, self.id, self.start)
+        return "%s: %s" % (self.event, self.timespan_description())
         
     @classmethod
     def Event(cls):

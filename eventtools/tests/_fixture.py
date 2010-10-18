@@ -26,6 +26,21 @@ def fixture(self):
     self.performance_tomorrow = Occurrence.objects.create(event=self.performance, start=datetime(2010,10,11,20,00))
     self.performance_day_after_tomorrow = Occurrence.objects.create(event=self.performance, start=datetime(2010,10,12,20,00))
 
+    #an event with many occurrences
+    # deleting the 2nd jan, because we want to test it isn't displayed
+    self.daily_tour = Event.objects.create(name="Daily Tour", slug="daily-tour")
+    for day in range(50):
+        if day !=2:
+            d = date(2010,1,1) + timedelta(day)
+            self.daily_tour.occurrences.create(start=d)
+
+
+    self.weekly_talk = Event.objects.create(name="Weekly Talk", slug="weekly-talk")
+    for day in range(50):
+        d = date(2010,1,1) + timedelta(day*7)
+        self.daily_tour.occurrences.create(start=datetime.combine(d, time(10,00), end=datetime.combine(d, time(12,00))
+
+
     #an event with some variations
     self.film = Event.objects.create(name="Film Night", venue=self.cinema_1)
     self.film_with_popcorn = Event.objects.create(parent=self.film, name="Film Night", difference_from_parent="free popcorn", venue=self.cinema_1)

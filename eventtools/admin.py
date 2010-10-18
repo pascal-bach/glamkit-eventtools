@@ -2,6 +2,7 @@ from django.contrib import admin
 from mptt.admin import MPTTModelAdmin
 from diff import generate_diff
 import django
+from eventtools import adminviews
 
 def create_children(modeladmin, request, queryset):
     for event in queryset:
@@ -14,6 +15,17 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
         actions = [create_children]
         exclude = ['parent']
         change_form_template = 'admin/eventtools/event.html'
+        save_on_top = True
+        
+        # list_display = ('title', 'edit_occurrences_link', 'all_occurrences_count', 'my_occurrences_count')
+
+        # def get_urls(self):
+        #     super_urls = super(EventAdminBase, self).get_urls()
+        #     my_urls = patterns('',
+        #         url(r'^(?P<id>\d+)/occurrences/$', self.admin_site.admin_view(adminviews.occurrences), {'modeladmin': self}),
+        #         # url(r'^(?P<event_id>\d+)/create_exception/(?P<gen_id>\d+)/(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})/(?P<hour>\d{1,2})-(?P<minute>\d{1,2})-(?P<second>\d{1,2})/$', self.admin_site.admin_view(make_exceptional_occurrence), {'modeladmin': self}),
+        #     )
+        #     return my_urls + super_urls
     
         def change_view(self, request, object_id, extra_context=None):
             obj = EventModel.objects.get(pk=object_id)
@@ -41,4 +53,9 @@ else:
             pass
         return _FeinCMSEventAdmin
         
-    
+def OccurrenceAdmin(OccurrenceModel):
+    class _OccurrenceAdmin(admin.ModelAdmin):
+        list_display = ['__unicode__','start','end','event',]
+        list_editable = ['start','end','event',]
+        # list_filter = ['event',]
+    return _OccurrenceAdmin
