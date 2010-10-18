@@ -14,7 +14,31 @@ def occurrence(request, occurrence_id, qs, event_slug=None):
     return render_to_response('eventtools/occurrence.html', {'occurrence': occurrence}, context_instance=RequestContext(request))
     
 def event(request, event_slug, qs):
-    return render_to_response('eventtools/occurrence_list.html', {}, context_instance=RequestContext(request))
+    event = get_object_or_404(qs, slug=event_slug)
+    event_descendants = event.get_descendants(include_self=True)
+    occurrence_pool = event_descendants.occurrences()
+    
+    paginator = Paginator(occurrence_pool, settings.OCCURRENCES_PER_PAGE)
+
+    # Make sure page request is an int. If not, deliver first page.
+    try:
+        page = int(request.GET.get('page', '1'))
+    except ValueError:
+        page = 1
+
+   # If page request (9999) is out of range, deliver last page of results.
+    try:
+        pageinfo = paginator.page(page)
+    except (EmptyPage, InvalidPage):
+        pageinfo = paginator.page(paginator.num_pages)
+
+    return render_to_response('eventtools/occurrence_list.html', {
+        'event': event,
+        'event_children': event_descendants,
+        'occurrence_pool': occurrence_pool,
+        'occurrence_page': pageinfo.object_list,
+        'pageinfo': pageinfo,
+    }, context_instance=RequestContext(request))
     
 def occurrence_list(request, qs):
     
@@ -27,7 +51,7 @@ def occurrence_list(request, qs):
         earlier = (date_bounds[0] - date_delta, date_bounds[1] - date_delta)
         later = (date_bounds[0] + date_delta, date_bounds[1] + date_delta) 
                 
-        occurrence_pageinfo = {
+        pageinfo = {
             'date_span': mark_safe(humanized_date_range(*date_bounds, imply_year=False, space="&nbsp;", range_str="&ndash;")),
             'previous_date_span': {
                 'start': earlier[0].date().isoformat(),
@@ -44,7 +68,7 @@ def occurrence_list(request, qs):
             'date_bounds': date_bounds,
             'occurrence_pool': occurrence_pool,
             'occurrence_page': occurrence_pool,
-            'occurrence_pageinfo': occurrence_pageinfo,
+            'pageinfo': pageinfo,
         }, context_instance=RequestContext(request))
 
     else:
@@ -59,12 +83,12 @@ def occurrence_list(request, qs):
 
        # If page request (9999) is out of range, deliver last page of results.
         try:
-            occurrence_pageinfo = paginator.page(page)
+            pageinfo = paginator.page(page)
         except (EmptyPage, InvalidPage):
-            occurrence_pageinfo = paginator.page(paginator.num_pages)
+            pageinfo = paginator.page(paginator.num_pages)
                 
         return render_to_response('eventtools/occurrence_list.html',{
             'occurrence_pool': occurrence_pool,
-            'occurrence_page': occurrence_pageinfo.object_list,
-            'occurrence_pageinfo': occurrence_pageinfo,
+            'occurrence_page': pageinfo.object_list,
+            'pageinfo': pageinfo,
         }, context_instance=RequestContext(request))

@@ -25,16 +25,16 @@
 	<div class="pagination">
 		{% block pagination %}
 			<span class="step-links">
-					{% if occurrence_pageinfo.has_previous %}
-							<a href="?{% get_string 'page' occurrence_pageinfo.previous_page_number %}">Earlier</a>
+					{% if pageinfo.has_previous %}
+							<a href="?{% get_string 'page' pageinfo.previous_page_number %}">Earlier</a>
 					{% endif %}
 
 					<span class="current">
-							Showing {{ occurrence_pageinfo.start_index }}&ndash;{{ occurrence_pageinfo.end_index }} of {{ occurrence_pageinfo.paginator.count }}.
+							Showing {{ pageinfo.start_index }}&ndash;{{ pageinfo.end_index }}&nbsp;of&nbsp;{{ pageinfo.paginator.count }}.
 					</span>
 
-					{% if occurrence_pageinfo.has_next %}
-							<a href="?{% get_string 'page' occurrence_pageinfo.next_page_number %}">Later</a>
+					{% if pageinfo.has_next %}
+							<a href="?{% get_string 'page' pageinfo.next_page_number %}">Later</a>
 					{% endif %}
 			</span>
 		{% endblock pagination %}

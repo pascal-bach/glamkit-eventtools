@@ -63,7 +63,7 @@ class TestViews(AppTestCase):
         #should have some pagination (6 pages)
         self.assertNotContains(r, "Earlier") #it's the first page
         self.assertContains(r, "Later")
-        self.assertContains(r, "Showing 1&ndash;20 of 109")
+        self.assertContains(r, "Showing 1&ndash;20&nbsp;of&nbsp;109")
 
         self.assertContains(r, "Friday, 1 January 2010", 1) #only print the date once
         self.assertNotContains(r, "Saturday, 2 January 2010") #there are no events
@@ -116,25 +116,21 @@ class TestViews(AppTestCase):
         # self.assertContains(r, '<a href="?datefrom=2009-12-01&dateto=2009-12-31">December 2009</a>')
         # self.assertContains(r, '<a href="?datefrom=2010-02-01&dateto=2010-02-28">February 2010</a>')
 
-    #     
-    # def test_event_view(self):
-    #     """
-    #     You can view a paginated list of occurrences for an event.
-    #     """
-    #     #event page
-    #     e = self.daily_tour
-    #     eurl = reverse('event', kwargs={'event_slug': e.slug})
-    #     r3 = self.client.get(eurl, {'page': 2})
-    #     self.assertEqual(r3.status_code, 200)
-    #     self.assertTrue(ourl in r3.response)
-    # 
-    #     #should have some pagination (3 pages)
-    #     self.assertEqual(r3.context['occurrence_page'].count(), 20)
-    #     self.assertContains(r3.response, "Earlier")
-    #     self.assertContains(r3.response, "Later")
-    #     self.assertContains(r3.response, "1")
-    #     self.assertContains(r3.response, "2")
-    #     self.assertContains(r3.response, "3")
+    def test_event_view(self):
+        """
+        You can view a paginated list of occurrences for an event.
+        """
+        #event page
+        e = self.daily_tour
+        eurl = reverse('event', kwargs={'event_slug': e.slug})
+        r3 = self.client.get(eurl, {'page': 2})
+        self.assertEqual(r3.status_code, 200)
+        
+        #should have some pagination (3 pages)
+        self.assertEqual(r3.context['occurrence_page'].count(), 20)
+        self.assertContains(r3, "Earlier")
+        self.assertContains(r3, "Later")
+        self.assertContains(r3, "Showing 21&ndash;40&nbsp;of&nbsp;49")
 
     def test_hcal(self):
         """
