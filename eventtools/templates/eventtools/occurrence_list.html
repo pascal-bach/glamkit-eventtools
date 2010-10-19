@@ -1,6 +1,11 @@
 {% extends "_base.html" %}
 {% load get_string %}
 
+{% block extrahead %}
+	<link rel="profile" href="http://microformats.org/profile/hcalendar">
+{% endblock %}
+
+
 {% block content %}
 
 	{% regroup occurrence_page by start_date as day_list %}

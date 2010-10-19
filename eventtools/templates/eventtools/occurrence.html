@@ -1,5 +1,9 @@
 {% extends "_base.html" %}
 
+{% block extrahead %}
+	<link rel="profile" href="http://microformats.org/profile/hcalendar">
+{% endblock %}
+
 {% block content %}
 	<h1>{{ occurrence.event }}</h1>
 	<p>{{ occurrence.html_timespan }}</p>

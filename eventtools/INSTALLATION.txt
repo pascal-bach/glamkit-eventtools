@@ -26,7 +26,10 @@
     
     * In EventMeta, define the fields that you want to be automatically inherited by children (children_inherit)
 
+    * You can also rename the manager, by default called `eventobjects`.
+
     * Define a model that subclasses models.OccurrenceModel. Give it a FK to the 1st model called 'event' that has a related name 'occurrences'
+    
 
 4. Set up admin:
         Event registered with EventAdmin

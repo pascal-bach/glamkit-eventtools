@@ -10,8 +10,8 @@ def fixture(self):
     self.cinema_2 = Venue.objects.create(name="Cinema 2", slug="cinema-2")
     
     #some simple events
-    self.talk = Event.objects.create(name="Curator's Talk", venue=self.gallery)
-    self.performance = Event.objects.create(name="A performance", venue=self.auditorium)
+    self.talk = Event.eventobjects.create(name="Curator's Talk", venue=self.gallery)
+    self.performance = Event.eventobjects.create(name="A performance", venue=self.auditorium)
     
     #some useful dates
     self.day1 = date(2010,10,10)
@@ -28,24 +28,24 @@ def fixture(self):
 
     #an event with many occurrences
     # deleting the 2nd jan, because we want to test it isn't displayed
-    self.daily_tour = Event.objects.create(name="Daily Tour", slug="daily-tour")
+    self.daily_tour = Event.eventobjects.create(name="Daily Tour", slug="daily-tour")
     for day in range(50):
         if day !=1: #2nd of month.
             d = date(2010,1,1) + timedelta(day)
             self.daily_tour.occurrences.create(start=d)
 
 
-    self.weekly_talk = Event.objects.create(name="Weekly Talk", slug="weekly-talk")
+    self.weekly_talk = Event.eventobjects.create(name="Weekly Talk", slug="weekly-talk")
     for day in range(50):
         d = date(2010,1,1) + timedelta(day*7)
         self.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
 
 
     #an event with some variations
-    self.film = Event.objects.create(name="Film Night", venue=self.cinema_1)
-    self.film_with_popcorn = Event.objects.create(parent=self.film, name="Film Night", difference_from_parent="free popcorn", venue=self.cinema_1)
-    self.film_with_talk = Event.objects.create(parent=self.film, name="Film Night", difference_from_parent="director's talk", venue=self.auditorium)
-    self.film_with_talk_and_popcorn = Event.objects.create(parent=self.film_with_talk, name="Film Night", difference_from_parent="popcorn and director's talk", venue=self.cinema_2)
+    self.film = Event.eventobjects.create(name="Film Night", venue=self.cinema_1)
+    self.film_with_popcorn = Event.eventobjects.create(parent=self.film, name="Film Night", difference_from_parent="free popcorn", venue=self.cinema_1)
+    self.film_with_talk = Event.eventobjects.create(parent=self.film, name="Film Night", difference_from_parent="director's talk", venue=self.auditorium)
+    self.film_with_talk_and_popcorn = Event.eventobjects.create(parent=self.film_with_talk, name="Film Night", difference_from_parent="popcorn and director's talk", venue=self.cinema_2)
     
     # self.film_with_popcorn.move_to(self.film, position='first-child')
     # self.film_with_talk.move_to(self.film, position='first-child')
@@ -68,7 +68,7 @@ def reload_films(self):
 
 def bigfixture(self):
     # have to create some more events since we are working from 'today'.
-    self.pe = Event.objects.create(name="proliferating event")
+    self.pe = Event.eventobjects.create(name="proliferating event")
 
     self.todaynow = datetime.now()
 

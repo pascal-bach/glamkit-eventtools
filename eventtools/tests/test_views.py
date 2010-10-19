@@ -21,6 +21,7 @@ class TestViews(AppTestCase):
         
         #occurrence page
         ourl = reverse('occurrence', args=(e.slug, o.id,))
+        self.assertEqual(o.get_absolute_url(), ourl)
         self.assertTrue(str(o.id) in ourl)
         r1 = self.client.get(ourl)
         self.assertEqual(r1.status_code, 200)
@@ -84,7 +85,7 @@ class TestViews(AppTestCase):
         self.assertContains(r, ourl)
         
         #show a 'not found' message
-        r = self.client.get(url,  {'startdate':'2020-01-01'})
+        r = self.client.get(url, {'startdate':'2020-01-01'})
         self.assertEqual(r.context['occurrence_page'].count(), 0)
         self.assertContains(r, "Sorry, no events were found")
         self.assertNotContains(r, "Earlier")
@@ -102,7 +103,7 @@ class TestViews(AppTestCase):
 
         url = reverse('occurrence_list',)
         r = self.client.get(url,  {'startdate':'2010-01-01', 'enddate':'2010-01-05'})
-        self.assertEqual(r.context['occurrence_pool'].count(), 5)
+        self.assertEqual(r.context['occurrence_pool'].count(), 109)
         self.assertEqual(len(r.context['occurrence_page']), 5)
         self.assertEqual(r.context['occurrence_page'][0].start.date(), date(2010,1,1))
         self.assertEqual(r.context['occurrence_page'].reverse()[0].start.date(), date(2010,1,5))
@@ -123,6 +124,7 @@ class TestViews(AppTestCase):
         #event page
         e = self.daily_tour
         eurl = reverse('event', kwargs={'event_slug': e.slug})
+        self.assertEqual(e.get_absolute_url(), eurl)
         r3 = self.client.get(eurl, {'page': 2})
         self.assertEqual(r3.status_code, 200)
         
@@ -132,17 +134,19 @@ class TestViews(AppTestCase):
         self.assertContains(r3, "Later")
         self.assertContains(r3, "Showing 21&ndash;40&nbsp;of&nbsp;49")
 
-    def test_hcal(self):
-        """
-        The page uses hCalendar microformat.
-        """
-
     def test_ical(self):
         """
         You can view an ical for an occurrence.
         The ical is linked from the occurrence page.
         You can view an ical for a collection of occurrences.
         (TODO: do large icals perform well? If not we might have to make it a feed.)
+        """
+        
+
+    def test_hcal(self):
+        """
+        The occurrence page uses hCalendar microformat.
+        The occurrence listing page uses hCalendar microformat.
         """
 
     def test_feeds(self):

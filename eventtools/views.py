@@ -40,12 +40,11 @@ def event(request, event_slug, qs):
         'pageinfo': pageinfo,
     }, context_instance=RequestContext(request))
     
-def occurrence_list(request, qs):
-    
+def occurrence_list(request, qs):    
+
     occurrence_pool, date_bounds = qs.from_GET(request.GET)
-    
     if date_bounds[0] is not None and date_bounds[1] is not None:
-        # we're doing a date-bounded view, and the pool in tiny.
+        # we're doing a date-bounded view. We can't keep the pool bound
         date_delta = relativedelta(date_bounds[1]+relativedelta(days=1), date_bounds[0])
         
         earlier = (date_bounds[0] - date_delta, date_bounds[1] - date_delta)
@@ -66,7 +65,7 @@ def occurrence_list(request, qs):
 
         return render_to_response('eventtools/occurrence_datespan.html',{
             'date_bounds': date_bounds,
-            'occurrence_pool': occurrence_pool,
+            'occurrence_pool': qs,
             'occurrence_page': occurrence_pool,
             'pageinfo': pageinfo,
         }, context_instance=RequestContext(request))

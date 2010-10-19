@@ -1,15 +1,17 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from django.utils.safestring import mark_safe
+from django.core.urlresolvers import reverse
+
 from eventtools.utils import datetimeify, dayify
-from datetime import date, time, datetime
 from eventtools.conf import settings
 from eventtools.utils import dateranges
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 
-from dateutil import parser as dateparser
-from django.core.exceptions import ValidationError
-from dateutil.relativedelta import relativedelta
+from datetime import date, time, datetime
 
-from django.utils.safestring import mark_safe
+from dateutil import parser as dateparser
+from dateutil.relativedelta import relativedelta
 
 
 class OccurrenceQuerySetFN(object):
@@ -295,7 +297,7 @@ class OccurrenceQuerySetFN(object):
         Return a queryset corresponding to the events matched by these occurrences.
         """
         event_ids = self.values_list('event_id', flat=True).distinct()
-        return self.model.Event().objects.filter(id__in=event_ids)
+        return self.model.Event()._event_manager.filter(id__in=event_ids)
         
     def from_GET(self, GET={}):
         mapped_GET = {}
@@ -408,7 +410,7 @@ class OccurrenceModel(models.Model):
                 date_range_str="&ndash;", 
                 time_range_str="&ndash;", 
                 separator=":", 
-                grand_range_str="&nbsp;&ndash;&nbsp;", 
+                grand_range_str="&nbsp;&ndash;&nbsp;",
             ))
         return mark_safe(pprint_datetime_span(self.start, self.end, infer_all_day=False))
 
@@ -467,3 +469,6 @@ class OccurrenceModel(models.Model):
 
     def start_date(self):
         return self.start.date()
+        
+    def get_absolute_url(self):
+        return reverse('occurrence', kwargs={'event_slug': self.event.slug, 'occurrence_id': self.id })

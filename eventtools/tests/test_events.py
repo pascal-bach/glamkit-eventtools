@@ -26,7 +26,7 @@ class TestEvents(AppTestCase):
             x= o.start
 
         #test utils:
-        e = Event.objects.all()[0]
+        e = Event.eventobjects.all()[0]
         occ_count = e.occurrences.count()
         e.occurrences.create(start=datetime.now())
         self.ae(occ_count+1, e.occurrences.count())
@@ -95,23 +95,23 @@ class TestEvents(AppTestCase):
         You can get the opening and closing occurrence for an event:
         
         """
-        all_occs = Event.objects.occurrences()
+        all_occs = Event.eventobjects.occurrences()
         self.ae(list(all_occs), list(Occurrence.objects.all()))
        
-        gallery_occs = Event.objects.filter(venue=self.gallery).occurrences()
+        gallery_occs = Event.eventobjects.filter(venue=self.gallery).occurrences()
         self.ae(len(gallery_occs), 3)
         self.assertTrue(self.talk_morning in gallery_occs)
         self.assertTrue(self.talk_afternoon in gallery_occs)
         self.assertTrue(self.talk_tomorrow_morning_cancelled in gallery_occs)
         
         #two similar syntaxes
-        cancelled_gallery_occs1 = Event.objects.filter(venue=self.gallery).occurrences(status='cancelled')
-        cancelled_gallery_occs2 = Event.objects.filter(venue=self.gallery).occurrences().filter(status='cancelled')
+        cancelled_gallery_occs1 = Event.eventobjects.filter(venue=self.gallery).occurrences(status='cancelled')
+        cancelled_gallery_occs2 = Event.eventobjects.filter(venue=self.gallery).occurrences().filter(status='cancelled')
         self.ae(list(cancelled_gallery_occs1), list(cancelled_gallery_occs2))
         self.ae(list(cancelled_gallery_occs2), [self.talk_tomorrow_morning_cancelled])
         
         # just checking a queryset is returned and can be further refined
-        gallery_occs = Event.objects.filter(venue=self.gallery).occurrences().after(self.day2)
+        gallery_occs = Event.eventobjects.filter(venue=self.gallery).occurrences().after(self.day2)
         self.ae(list(gallery_occs), [self.talk_tomorrow_morning_cancelled])
         
         #opening and closing
@@ -179,32 +179,35 @@ class TestEvents(AppTestCase):
         
         """
         
-        o = Event.objects.opening_before(self.day1)
-        self.ae(list(o), [self.talk, self.performance, self.daily_tour, self.weekly_talk, self.film])
-        o = Event.objects.opening_after(self.day1)
-        self.ae(list(o), [self.talk, self.performance, self.film, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
-        o = Event.objects.opening_between(self.day1, self.day2)
-        self.ae(list(o), [self.talk, self.performance, self.film, self.film_with_popcorn])
-        o = Event.objects.opening_on(self.day1)
-        self.ae(list(o), [self.talk, self.performance, self.film])
-        o = Event.objects.opening_on(self.day2)
-        self.ae(list(o), [self.film_with_popcorn])
+        o = Event.eventobjects.opening_before(self.day1)
+        self.ae(set(o), set([self.talk, self.performance, self.daily_tour, self.weekly_talk, self.film]))
+        o = Event.eventobjects.opening_after(self.day1)
+        self.ae(
+            set(o),
+            set([self.talk, self.performance, self.film, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
+        )
+        o = Event.eventobjects.opening_between(self.day1, self.day2)
+        self.ae(set(o), set([self.talk, self.performance, self.film, self.film_with_popcorn]))
+        o = Event.eventobjects.opening_on(self.day1)
+        self.ae(set(o), set([self.talk, self.performance, self.film]))
+        o = Event.eventobjects.opening_on(self.day2)
+        self.ae(set(o), set([self.film_with_popcorn]))
         
-        c = Event.objects.closing_before(self.day2)
-        self.ae(list(c), [self.talk, self.daily_tour, self.film, self.film_with_popcorn])
-        c = Event.objects.closing_after(self.day2)
-        self.ae(list(c), [self.talk, self.performance, self.weekly_talk, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
-        c = Event.objects.closing_between(self.day1, self.day2)
-        self.ae(list(c), [self.talk, self.film, self.film_with_popcorn])
-        c = Event.objects.closing_on(self.day2)
-        self.ae(list(c), [self.talk, self.film_with_popcorn])
-        c = Event.objects.closing_on(self.day1)
-        self.ae(list(c), [self.film])
+        c = Event.eventobjects.closing_before(self.day2)
+        self.ae(set(c), set([self.talk, self.daily_tour, self.film, self.film_with_popcorn]))
+        c = Event.eventobjects.closing_after(self.day2)
+        self.ae(set(c), set([self.talk, self.performance, self.weekly_talk, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn]))
+        c = Event.eventobjects.closing_between(self.day1, self.day2)
+        self.ae(set(c), set([self.talk, self.film, self.film_with_popcorn]))
+        c = Event.eventobjects.closing_on(self.day2)
+        self.ae(set(c), set([self.talk, self.film_with_popcorn]))
+        c = Event.eventobjects.closing_on(self.day1)
+        self.ae(set(c), set([self.film]))
         
     def test_GET(self):
         """        
         a (GET) dictionary, containing date(time) from and to parameters can be passed.
-           Event.objects.filter(venue=the_library, cancelled=True).occurrences_from_GET_params(request.GET, 'from', 'to')
+           Event.eventobjects.filter(venue=the_library, cancelled=True).occurrences_from_GET_params(request.GET, 'from', 'to')
         This returns a tuple of the parsed dates, too.
         """
         self.ae(list(Occurrence.objects.from_GET()[0]), list(Occurrence.objects.forthcoming()))        
@@ -262,11 +265,11 @@ class TestEvents(AppTestCase):
     #     self.ae(self.new_film.slug, 'the-slug')        
     # 
     #     #creation (saving)
-    #     self.new_film = Event.objects.create(parent=self.film)
+    #     self.new_film = Event.eventobjects.create(parent=self.film)
     #     self.ae(self.new_film.name, self.film.name)
     # 
     #     #get_or_create
-    #     self.next_new_film, created = Event.objects.get_or_create(parent=self.film, slug="new-slug")
+    #     self.next_new_film, created = Event.eventobjects.get_or_create(parent=self.film, slug="new-slug")
     #     self.ae(self.next_new_film.name, self.film.name)
     #     self.ae(self.next_new_film.slug, 'new-slug')        
 
@@ -289,22 +292,22 @@ class TestEvents(AppTestCase):
         
         Fundamentally, we want to be able to run queries that return events based on properties of their relatives:
         
-        Event.objects.with_children_having(*args, *kwargs)
-        Event.objects.with_descendants_having(*args, *kwargs)
-        Event.objects.with_parent_having(*args, *kwargs)
-        Event.objects.with_ancestors_having(*args, *kwargs)
-        Event.objects.without_children_having(*args, *kwargs)
-        Event.objects.without_descendants_having(*args, *kwargs)
-        Event.objects.without_parent_having(*args, *kwargs)
-        Event.objects.without_ancestors_having(*args, *kwargs)
+        Event.eventobjects.with_children_having(*args, *kwargs)
+        Event.eventobjects.with_descendants_having(*args, *kwargs)
+        Event.eventobjects.with_parent_having(*args, *kwargs)
+        Event.eventobjects.with_ancestors_having(*args, *kwargs)
+        Event.eventobjects.without_children_having(*args, *kwargs)
+        Event.eventobjects.without_descendants_having(*args, *kwargs)
+        Event.eventobjects.without_parent_having(*args, *kwargs)
+        Event.eventobjects.without_ancestors_having(*args, *kwargs)
         
         (This should go into mptt some day)
         """
         
-        self.has_no_occurrences = Event.objects.create(name="no occurrences")
-        self.has_some_occurrences = Event.objects.create(parent=self.has_no_occurrences, name="some occurrences")
+        self.has_no_occurrences = Event.eventobjects.create(name="no occurrences")
+        self.has_some_occurrences = Event.eventobjects.create(parent=self.has_no_occurrences, name="some occurrences")
         self.has_some_occurrences.occurrences.create(start=date.today())
-        self.has_some_more_occurrences = Event.objects.create(parent=self.has_some_occurrences, name="more occurrences")
+        self.has_some_more_occurrences = Event.eventobjects.create(parent=self.has_some_occurrences, name="more occurrences")
         self.has_some_more_occurrences.occurrences.create(start=date.today())
         
         #reload!
@@ -349,6 +352,20 @@ class TestEvents(AppTestCase):
         #a useful derivative
         highest_having_occurrences = tree.highest_having_occurrences()
         self.assertEqual(list(highest_having_occurrences), [self.has_some_occurrences])
+        
+        #get the highest ancestor of self that has occurrences (if any). This could be a good 'normalisation' process.
+        self.ae(self.has_some_more_occurrences.highest_ancestor_having_occurrences(), self.has_some_occurrences)
+        self.ae(self.has_some_occurrences.highest_ancestor_having_occurrences(), self.has_some_occurrences)
+        self.ae(self.has_some_occurrences.highest_ancestor_having_occurrences(include_self=False), None)
+        self.ae(self.has_no_occurrences.highest_ancestor_having_occurrences(test=True), None)
+        self.ae(self.has_no_occurrences.highest_ancestor_having_occurrences(include_self=False), None)
+
+        # self.ae(self.has_some_more_occurrences.highest_descendant_having_occurrences(), self.has_some_occurrences)
+        # self.ae(self.has_some_occurrences.highest_descendant_having_occurrences(), self.has_some_occurrences)
+        # self.ae(self.has_some_occurrences.highest_descendant_having_occurrences(include_self=False), None)
+        # self.ae(self.has_no_occurrences.highest_descendant_having_occurrences(), None)
+        # self.ae(self.has_no_occurrences.highest_descendant_having_occurrences(include_self=False), None)
+
                 
     def test_event_family(self):
         """
