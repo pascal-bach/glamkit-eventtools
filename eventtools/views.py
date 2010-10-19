@@ -1,11 +1,13 @@
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template.context import RequestContext
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
+from django.utils.safestring import mark_safe
+from django.conf.urls.defaults import *
+from django.http import HttpResponse
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import humanized_date_range
 from dateutil.relativedelta import relativedelta
-from django.utils.safestring import mark_safe
-from django.conf.urls.defaults import *
+from vobject import iCalendar
 
 
 class EventViews(object):
@@ -20,49 +22,96 @@ class EventViews(object):
             url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/$', self.occurrence, name='occurrence'),
         
             # #ical
-            # url(r'^events\.ics$', 'occurrence_list_ical', {'qs': Occurrence.objects.all()}, name='occurrence_list_ical'),
-            # url(r'^(?P<event_slug>[-\w]+)/info\.ical$', 'event_ical', {'qs': Event.eventobjects.all()}, name='event_ical'),
-            # url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/events\.ics$', \
-            #     'occurrence_ical', {'qs': Occurrence.objects.all()}, name='occurrence_ical'),
+            url(r'^events\.ics$', self.occurrence_list_ical, name='occurrence_list_ical'),
+            url(r'^(?P<event_slug>[-\w]+)/events\.ics$', self.event_ical, name='event_ical'),
+            url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/events\.ics$', \
+                self.occurrence_ical, name='occurrence_ical'),
         )
     
-    def occurrence(self, request, occurrence_id, event_slug=None):
+    def response_as_ical(self, request, occurrences):
+        ical = iCalendar()
+        ical.add('X-WR-CALNAME').value = settings.ICAL_CALNAME
+        ical.add('X-WR-CALDESC').value = settings.ICAL_CALDESC
+        ical.add('method').value = 'PUBLISH'  # IE/Outlook needs this
+    
+        if hasattr(occurrences, '__iter__'):
+            for occ in occurrences:
+                ical = occ.as_icalendar(ical, request)
+        else:
+            ical = occurrences.as_icalendar(ical, request)
+        
+        icalstream = ical.serialize()
+        response = HttpResponse(icalstream, mimetype='text/calendar')
+        response['Filename'] = 'events.ics'  # IE needs this
+        response['Content-Disposition'] = 'attachment; filename=events.ics'
+
+        return response
+    
+
+
+    #occurrence
+    def _occurrence_context(self, request, occurrence_id, event_slug):
         if event_slug:
             qs = self.occurrence_qs.filter(event__slug=event_slug)
-        occurrence = get_object_or_404(qs, id=occurrence_id)
+        return {
+            'occurrence': get_object_or_404(qs, id=occurrence_id)
+        }
+    
+    def occurrence(self, request, occurrence_id, event_slug=None):
+        context = self._occurrence_context(request, occurrence_id, event_slug)
+        return render_to_response('eventtools/occurrence.html', context, context_instance=RequestContext(request))
 
-        return render_to_response('eventtools/occurrence.html', {'occurrence': occurrence}, context_instance=RequestContext(request))
+    def occurrence_ical(self, request, occurrence_id, event_slug=None):
+        context = self._occurrence_context(request, occurrence_id, event_slug)
+        return self.response_as_ical(request, [context['occurrence']])
+        
+    #event
+    def _event_context(self, request, event_slug):
+        event = get_object_or_404(self.event_qs, slug=event_slug)
+        event_descendants = event.get_descendants(include_self=True)
+        occurrence_pool = event_descendants.occurrences()
+
+        return {
+            'event': event,
+            'event_children': event_descendants,
+            'occurrence_pool': occurrence_pool,
+        }
+
+    def _paginate(self, request, pool):
+        paginator = Paginator(pool, settings.OCCURRENCES_PER_PAGE)
+
+        # Make sure page request is an int. If not, deliver first page.
+        try:
+            page = int(request.GET.get('page', '1'))
+        except ValueError:
+            page = 1
+
+       # If page request (9999) is out of range, deliver last page of results.
+        try:
+            pageinfo = paginator.page(page)
+        except (EmptyPage, InvalidPage):
+            pageinfo = paginator.page(paginator.num_pages)
+
+        return pageinfo
     
     def event(self, request, event_slug):
-                event = get_object_or_404(self.event_qs, slug=event_slug)
-                event_descendants = event.get_descendants(include_self=True)
-                occurrence_pool = event_descendants.occurrences()
-    
-                paginator = Paginator(occurrence_pool, settings.OCCURRENCES_PER_PAGE)
+        event_context = self._event_context(request, event_slug)
+        pageinfo = self._paginate(request, event_context['occurrence_pool'])
+        
+        event_context.update({
+            'occurrence_page': pageinfo.object_list,
+            'pageinfo': pageinfo,
+        })
 
-                # Make sure page request is an int. If not, deliver first page.
-                try:
-                    page = int(request.GET.get('page', '1'))
-                except ValueError:
-                    page = 1
+        return render_to_response('eventtools/occurrence_list.html', event_context, context_instance=RequestContext(request))
+ 
+    def event_ical(self, request, event_slug):
+        event_context = self._event_context(request, event_slug)
+        return self.response_as_ical(request, event_context['occurrence_pool'])
 
-               # If page request (9999) is out of range, deliver last page of results.
-                try:
-                    pageinfo = paginator.page(page)
-                except (EmptyPage, InvalidPage):
-                    pageinfo = paginator.page(paginator.num_pages)
-
-                return render_to_response('eventtools/occurrence_list.html', {
-                    'event': event,
-                    'event_children': event_descendants,
-                    'occurrence_pool': occurrence_pool,
-                    'occurrence_page': pageinfo.object_list,
-                    'pageinfo': pageinfo,
-                }, context_instance=RequestContext(request))
-    
-    def occurrence_list(self, request, *args, **kwargs):    
-
-        occurrence_pool, date_bounds = self.occurrence_qs.from_GET(request.GET)
+    #occurrence_list
+    def _occurrence_list_context(self, request, qs):
+        occurrence_pool, date_bounds = qs.from_GET(request.GET)
         if date_bounds[0] is not None and date_bounds[1] is not None:
             # we're doing a date-bounded view. We can't keep the pool bound
             date_delta = relativedelta(date_bounds[1]+relativedelta(days=1), date_bounds[0])
@@ -82,15 +131,17 @@ class EventViews(object):
                 },
                 'date_delta': date_delta.days
             }
-
-            return render_to_response('eventtools/occurrence_datespan.html',{
-                'date_bounds': date_bounds,
-                'occurrence_pool': self.occurrence_qs,
-                'occurrence_page': occurrence_pool,
+            
+            return {
+                'bounded': True,
                 'pageinfo': pageinfo,
-            }, context_instance=RequestContext(request))
-
-        else:
+                'occurrence_pool': qs,
+                'occurrence_page': occurrence_pool,            
+            }
+            
+        else:         
+            pageinfo = self._paginate(request, occurrence_pool)
+            
             # we're paging through all events in the pool, OCCURRENCES_PER_PAGE at a time.
             paginator = Paginator(occurrence_pool, settings.OCCURRENCES_PER_PAGE)
 
@@ -105,9 +156,23 @@ class EventViews(object):
                 pageinfo = paginator.page(page)
             except (EmptyPage, InvalidPage):
                 pageinfo = paginator.page(paginator.num_pages)
-            
-            return render_to_response('eventtools/occurrence_list.html',{
-                'occurrence_pool': occurrence_pool,
-                'occurrence_page': pageinfo.object_list,
+
+            return {
+                'bounded': False,
                 'pageinfo': pageinfo,
-            }, context_instance=RequestContext(request))
+                'occurrence_pool': occurrence_pool,
+                'occurrence_page': pageinfo.object_list,            
+            }
+    
+    def occurrence_list(self, request): #probably want to override this for doing more filtering.
+        occurrence_context = self._occurrence_list_context(request, self.occurrence_qs)
+        if occurrence_context['bounded']: #2 dates given
+            template = 'eventtools/occurrence_datespan.html'
+        else:
+            template = 'eventtools/occurrence_list.html'
+            
+        return render_to_response(template ,occurrence_context, context_instance=RequestContext(request))
+        
+    def occurrence_list_ical(self, request, event_slug):
+        occurrence_list_context = self._occurrence_list_context(request, event_slug)
+        return self.response_as_ical(request, event_context['occurrence_pool'])

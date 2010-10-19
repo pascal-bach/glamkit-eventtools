@@ -27,6 +27,7 @@
 		{% endfor %}
 	</ul>
 
+	{% if occurrence_page %}
 	<div class="pagination">
 		{% block pagination %}
 			<span class="step-links">
@@ -44,5 +45,6 @@
 			</span>
 		{% endblock pagination %}
 	</div>
+	{% endif %}
 
 {% endblock %}

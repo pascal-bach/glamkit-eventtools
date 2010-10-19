@@ -13,3 +13,6 @@ EVENT_GET_MAP = {
 }
 
 OCCURRENCES_PER_PAGE = 20
+
+ICAL_CALNAME = "Events list"
+ICAL_CALDESC = "Events listing" #e.g. "Events listing from mysite.com"

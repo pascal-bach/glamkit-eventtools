@@ -13,6 +13,8 @@ from datetime import date, time, datetime
 from dateutil import parser as dateparser
 from dateutil.relativedelta import relativedelta
 
+from vobject.base import backslashEscape
+
 
 class OccurrenceQuerySetFN(object):
     """
@@ -399,6 +401,7 @@ class OccurrenceModel(models.Model):
     def relative_duration(self):
         return relativedelta(self.end, self.start)
 
+    @property
     def all_day(self):
         return self.start.time() == time.min and self.end.time() == time.max
     
@@ -472,3 +475,74 @@ class OccurrenceModel(models.Model):
         
     def get_absolute_url(self):
         return reverse('occurrence', kwargs={'event_slug': self.event.slug, 'occurrence_id': self.id })
+
+    def _resolve_attr(self, attr):
+        v = getattr(self, attr, None)
+        if v is not None:
+            if callable(v):
+                v = v()
+        return v
+        
+    def as_icalendar(self,
+        ical,
+        request,
+        summary_attr='__unicode__',
+        description_attr='ical_description',
+        url_attr='get_absolute_url',
+        location_attr='venue_description',
+        latitude_attr='latitude',
+        longitude_attr='longitude',
+        cancelled_attr='is_cancelled',
+    ):
+        """
+        Returns the occurrence as an iCalendar object.
+        
+        Pass in an iCalendar, and this function will add `self` to it, otherwise it will create a new iCalendar named `calname` described `caldesc`.
+        
+        The property parameters passed indicate properties of an Event that return the info to be shown in the ical.
+        
+        location_property is the string describing the location/venue.
+        
+        Props to Martin de Wulf, Andrew Turner, Derek Willis
+        http://www.multitasked.net/2010/jun/16/exporting-schedule-django-application-google-calen/
+        
+        
+        """
+        vevent = ical.add('vevent')
+
+        if self.all_day:            
+            vevent.add('dtstart').value = self.start.date()
+            vevent.add('dtend').value = self.end.date()
+        else:
+            vevent.add('dtstart').value = self.start
+            vevent.add('dtend').value = self.end
+        
+        cancelled = self._resolve_attr(cancelled_attr)
+        if cancelled:
+            vevent.add('method').value = 'CANCEL'
+            vevent.add('status').value = 'CANCELLED'
+                
+        summary = self._resolve_attr(summary_attr)
+        if summary:
+            vevent.add('summary').value = backslashEscape(summary)
+        
+        description = self._resolve_attr(description_attr)
+        if description:
+            vevent.add('description').value = backslashEscape(description)
+        
+        url = self._resolve_attr(url_attr)
+        if url:
+            domain = "".join(('http', ('', 's')[request.is_secure()], '://', request.get_host()))
+            
+            vevent.add('url').value = "%s%s" % (domain, url)
+        
+        location = self._resolve_attr(location_attr)
+        if location:
+            vevent.add('location').value = backslashEscape(location)
+            
+        lat = self._resolve_attr(latitude_attr)
+        lon = self._resolve_attr(longitude_attr)
+        if lat and lon:
+            vevent.add('geo').value = "%s;%s" % (lon, lat)
+            
+        return ical 

@@ -141,24 +141,35 @@ class TestViews(AppTestCase):
         You can view an ical for a collection of occurrences.
         (TODO: do large icals perform well? If not we might have to make it a feed.)
         """
-        # e = self.daily_tour
-        # o = e.occurrences()[0]
-        # 
-        # o_ical_url = reverse('occurrence_ical', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
-        # r = self.client.get(o_ical_url)
-        # self.assertEqual(r.status_code, 200)
-        # 
-        # print r.content
-        # 
-        # self.assertContains(r, "BEGIN:VCALENDAR", 1)
-        # self.assertContains(r, "BEGIN:VEVENT", 1)
-        # self.assertContains(r, "SUMMARY:Daily Tour", 1)
-        # self.assertContains(r, "DTSTART:2010x", 1)
-        # self.assertContains(r, "DTEND:2010x", 1)
-        #etc.
+        e = self.daily_tour
+        o = e.occurrences.all()[0]
         
-        
-        #Multiple events
+        o_url = reverse('occurrence', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
+        o_ical_url = reverse('occurrence_ical', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
+        r = self.client.get(o_ical_url)
+        self.assertEqual(r.status_code, 200)
+                
+        self.assertContains(r, "BEGIN:VCALENDAR", 1)
+        self.assertContains(r, "BEGIN:VEVENT", 1)
+        print r
+
+        self.assertContains(r, "SUMMARY:Daily Tour", 1)
+        self.assertContains(r, "DTSTART;VALUE=DATE:20100101", 1)
+        self.assertContains(r, "DTEND;VALUE=DATE:20100101", 1)
+        # self.assertContains(r, "URL;VALUE=URL:http://testserver%s" % o_url, 1)
+        # etc.
+    
+        #Multiple occurrences
+        e_ical_url = reverse('event_ical', kwargs={'event_slug': e.slug })
+        r = self.client.get(e_ical_url)
+        self.assertEqual(r.status_code, 200)
+
+                
+        self.assertContains(r, "BEGIN:VCALENDAR", 1)
+        self.assertContains(r, "BEGIN:VEVENT", 49)
+        self.assertContains(r, "SUMMARY:Daily Tour", 49)
+        self.assertContains(r, "DTSTART;VALUE=DATE:20100101", 1)
+        self.assertContains(r, "DTEND;VALUE=DATE:20100101", 1)
 
     def test_hcal(self):
         """

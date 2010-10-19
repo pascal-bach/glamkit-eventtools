@@ -6,7 +6,7 @@ from eventtools import adminviews
 
 def create_children(modeladmin, request, queryset):
     for event in queryset:
-        e = type(event).objects.create(parent=event)
+        e = type(event)._event_manager.create(parent=event)
 create_children.short_description = "Create children of selected events"
 
 
@@ -28,7 +28,7 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
         #     return my_urls + super_urls
     
         def change_view(self, request, object_id, extra_context=None):
-            obj = EventModel.objects.get(pk=object_id)
+            obj = EventModel._event_manager.get(pk=object_id)
 
             if obj.parent:
                 fields_diff = generate_diff(obj.parent, obj, include=EventModel._event_meta.fields_to_inherit)
