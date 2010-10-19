@@ -1,6 +1,7 @@
 # You can override these settings in Django.
 # Import with
 # from eventtools.conf import settings
+from django.conf import settings
 
 import calendar
 FIRST_DAY_OF_WEEK = calendar.MONDAY #you may prefer Saturday or Sunday.
@@ -14,5 +15,5 @@ EVENT_GET_MAP = {
 
 OCCURRENCES_PER_PAGE = 20
 
-ICAL_CALNAME = "Events list"
+ICAL_CALNAME = getattr(settings, 'SITE_NAME', 'Events list')
 ICAL_CALDESC = "Events listing" #e.g. "Events listing from mysite.com"

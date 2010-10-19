@@ -2,6 +2,9 @@
 
     pip install -e REQUIREMENTS.txt
 
+Define settings.SITE_NAME = "My site name" and settings.SITE_URL = "http://mysite.com"
+(These will be used in eventtools to publish pURLs).
+
 1. List the required applications in the ``INSTALLED_APPS`` portion of your settings
    file.  Your settings file might look something like::
    

@@ -18,13 +18,14 @@ class EventViews(object):
     def get_urls(self):
         return patterns('',
             url(r'^$', self.occurrence_list, name='occurrence_list'),
-            url(r'^(?P<event_slug>[-\w]+)/$', self.event, name='event'),
-            url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/$', self.occurrence, name='occurrence'),
+            url(r'^event/(?P<event_slug>[-\w]+)/$', self.event, name='event'),
+            url(r'^(?P<occurrence_id>\d+)/?$', self.occurrence, name="occurrence"), #canonical URL for collection item.
+            url(r'^(?P<occurrence_id>\d+)(?P<ignored_part>\+.*)/?$', self.occurrence),
         
             # #ical
             url(r'^events\.ics$', self.occurrence_list_ical, name='occurrence_list_ical'),
-            url(r'^(?P<event_slug>[-\w]+)/events\.ics$', self.event_ical, name='event_ical'),
-            url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/events\.ics$', \
+            url(r'^event/(?P<event_slug>[-\w]+)/events\.ics$', self.event_ical, name='event_ical'),
+            url(r'^(?P<occurrence_id>\d+)/events\.ics$', \
                 self.occurrence_ical, name='occurrence_ical'),
         )
     
@@ -50,19 +51,17 @@ class EventViews(object):
 
 
     #occurrence
-    def _occurrence_context(self, request, occurrence_id, event_slug):
-        if event_slug:
-            qs = self.occurrence_qs.filter(event__slug=event_slug)
+    def _occurrence_context(self, request, occurrence_id):
         return {
-            'occurrence': get_object_or_404(qs, id=occurrence_id)
+            'occurrence': get_object_or_404(self.occurrence_qs, id=occurrence_id)
         }
     
-    def occurrence(self, request, occurrence_id, event_slug=None):
-        context = self._occurrence_context(request, occurrence_id, event_slug)
+    def occurrence(self, request, occurrence_id, ignored_part=None):
+        context = self._occurrence_context(request, occurrence_id)
         return render_to_response('eventtools/occurrence.html', context, context_instance=RequestContext(request))
 
-    def occurrence_ical(self, request, occurrence_id, event_slug=None):
-        context = self._occurrence_context(request, occurrence_id, event_slug)
+    def occurrence_ical(self, request, occurrence_id):
+        context = self._occurrence_context(request, occurrence_id)
         return self.response_as_ical(request, [context['occurrence']])
         
     #event
@@ -166,6 +165,7 @@ class EventViews(object):
     
     def occurrence_list(self, request): #probably want to override this for doing more filtering.
         occurrence_context = self._occurrence_list_context(request, self.occurrence_qs)
+
         if occurrence_context['bounded']: #2 dates given
             template = 'eventtools/occurrence_datespan.html'
         else:
@@ -173,6 +173,7 @@ class EventViews(object):
             
         return render_to_response(template ,occurrence_context, context_instance=RequestContext(request))
         
-    def occurrence_list_ical(self, request, event_slug):
-        occurrence_list_context = self._occurrence_list_context(request, event_slug)
-        return self.response_as_ical(request, event_context['occurrence_pool'])
+    def occurrence_list_ical(self, request):
+        occurrence_list_context = self._occurrence_list_context(request, self.occurrence_qs)
+        pool = occurrence_list_context['occurrence_pool']
+        return self.response_as_ical(request, pool)

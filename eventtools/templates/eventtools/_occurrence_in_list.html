@@ -1,4 +1,4 @@
 <span class="vevent">
-<h3><a href="{% url occurrence occurrence.event.slug occurrence.id %}" class="summary">{{ occurrence.event }}</a></h3>
+<h3><a href="{% url occurrence occurrence.id %}" class="summary">{{ occurrence.event }}</a></h3>
 {% if not occurrence.all_day %}<p>{{ occurrence.html_time_description }}</p>{% endif %}
 </span>

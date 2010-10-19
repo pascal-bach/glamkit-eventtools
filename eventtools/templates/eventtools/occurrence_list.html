@@ -7,6 +7,9 @@
 
 
 {% block content %}
+	<p><a href="events.ics?{{ request.GET.urlencode }}">download .ics file</a></p>
+	<p><a href="webcal://{{request.get_host }}{{ request.get_full_path }}events.ics?{{ request.GET.urlencode }}">add to iCal/Outlook</a></p>
+	<p><a href="http://www.google.com/calendar/render?cid=http%3A%2F%2F{{request.get_host|urlencode }}{{ request.get_full_path|urlencode }}events.ics%3F{{ request.GET.urlencode }}">add to Google calendar</a></p>
 
 	{% regroup occurrence_page by start_date as day_list %}
 	
@@ -20,7 +23,7 @@
 							{% include "eventtools/_occurrence_in_list.html" %}
 						</li>
 					{% endfor %}
-				<ul>
+				</ul>
 			</li>
 		{% empty %}
 		<li>Sorry, no events were found</li>

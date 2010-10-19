@@ -20,7 +20,7 @@ class TestViews(AppTestCase):
         o = e.occurrences.all()[0]
         
         #occurrence page
-        ourl = reverse('occurrence', args=(e.slug, o.id,))
+        ourl = reverse('occurrence', args=(o.id,))
         self.assertEqual(o.get_absolute_url(), ourl)
         self.assertTrue(str(o.id) in ourl)
         r1 = self.client.get(ourl)
@@ -33,7 +33,7 @@ class TestViews(AppTestCase):
         self.assertNotContains(r1, "midnight")
 
         e2 = self.weekly_talk
-        ourl = reverse('occurrence', args=(e2.slug, e2.occurrences.all()[0].id))
+        ourl = reverse('occurrence', args=(e2.occurrences.all()[0].id,))
         r1 = self.client.get(ourl)
         self.assertContains(r1, "Weekly Talk")
         self.assertContains(r1, "1&nbsp;January&nbsp;2010, 10am&ndash;noon")
@@ -81,7 +81,7 @@ class TestViews(AppTestCase):
     
         #links
         o = r.context['occurrence_page'][0]
-        ourl = reverse('occurrence', args=(o.event.slug, o.id,))
+        ourl = reverse('occurrence', args=(o.id,))
         self.assertContains(r, ourl)
         
         #show a 'not found' message
@@ -90,6 +90,7 @@ class TestViews(AppTestCase):
         self.assertContains(r, "Sorry, no events were found")
         self.assertNotContains(r, "Earlier")
         self.assertNotContains(r, "Later")
+        self.assertNotContains(r, "Showing")
         self.assertEqual(r.status_code, 200) #not 404
         
         
@@ -144,26 +145,24 @@ class TestViews(AppTestCase):
         e = self.daily_tour
         o = e.occurrences.all()[0]
         
-        o_url = reverse('occurrence', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
-        o_ical_url = reverse('occurrence_ical', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
+        o_url = reverse('occurrence', kwargs={'occurrence_id': o.id })
+        o_ical_url = reverse('occurrence_ical', kwargs={'occurrence_id': o.id })
         r = self.client.get(o_ical_url)
         self.assertEqual(r.status_code, 200)
                 
         self.assertContains(r, "BEGIN:VCALENDAR", 1)
         self.assertContains(r, "BEGIN:VEVENT", 1)
-        print r
 
         self.assertContains(r, "SUMMARY:Daily Tour", 1)
         self.assertContains(r, "DTSTART;VALUE=DATE:20100101", 1)
         self.assertContains(r, "DTEND;VALUE=DATE:20100101", 1)
-        # self.assertContains(r, "URL;VALUE=URL:http://testserver%s" % o_url, 1)
+        self.assertContains(r, "URL:http://testserver%s" % o_url, 1)
         # etc.
     
         #Multiple occurrences
         e_ical_url = reverse('event_ical', kwargs={'event_slug': e.slug })
         r = self.client.get(e_ical_url)
         self.assertEqual(r.status_code, 200)
-
                 
         self.assertContains(r, "BEGIN:VCALENDAR", 1)
         self.assertContains(r, "BEGIN:VEVENT", 49)

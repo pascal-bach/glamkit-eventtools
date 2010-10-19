@@ -472,9 +472,10 @@ class OccurrenceModel(models.Model):
 
     def start_date(self):
         return self.start.date()
+
         
     def get_absolute_url(self):
-        return reverse('occurrence', kwargs={'event_slug': self.event.slug, 'occurrence_id': self.id })
+        return reverse('occurrence', kwargs={'occurrence_id': self.id })
 
     def _resolve_attr(self, attr):
         v = getattr(self, attr, None)
@@ -482,11 +483,16 @@ class OccurrenceModel(models.Model):
             if callable(v):
                 v = v()
         return v
+    
+    def ical_summary(self):
+        return unicode(self.event)
         
+    
+    
     def as_icalendar(self,
         ical,
         request,
-        summary_attr='__unicode__',
+        summary_attr='ical_summary',
         description_attr='ical_description',
         url_attr='get_absolute_url',
         location_attr='venue_description',
@@ -533,7 +539,6 @@ class OccurrenceModel(models.Model):
         url = self._resolve_attr(url_attr)
         if url:
             domain = "".join(('http', ('', 's')[request.is_secure()], '://', request.get_host()))
-            
             vevent.add('url').value = "%s%s" % (domain, url)
         
         location = self._resolve_attr(location_attr)
