@@ -31,7 +31,7 @@ class TestViews(AppTestCase):
         self.assertNotContains(r1, "00:00")
         self.assertNotContains(r1, "12am")
         self.assertNotContains(r1, "midnight")
-        
+
         e2 = self.weekly_talk
         ourl = reverse('occurrence', args=(e2.slug, e2.occurrences.all()[0].id))
         r1 = self.client.get(ourl)
@@ -141,7 +141,24 @@ class TestViews(AppTestCase):
         You can view an ical for a collection of occurrences.
         (TODO: do large icals perform well? If not we might have to make it a feed.)
         """
+        # e = self.daily_tour
+        # o = e.occurrences()[0]
+        # 
+        # o_ical_url = reverse('occurrence_ical', kwargs={'event_slug': e.slug, 'occurrence_id': o.id })
+        # r = self.client.get(o_ical_url)
+        # self.assertEqual(r.status_code, 200)
+        # 
+        # print r.content
+        # 
+        # self.assertContains(r, "BEGIN:VCALENDAR", 1)
+        # self.assertContains(r, "BEGIN:VEVENT", 1)
+        # self.assertContains(r, "SUMMARY:Daily Tour", 1)
+        # self.assertContains(r, "DTSTART:2010x", 1)
+        # self.assertContains(r, "DTEND:2010x", 1)
+        #etc.
         
+        
+        #Multiple events
 
     def test_hcal(self):
         """
