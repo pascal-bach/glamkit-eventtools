@@ -200,9 +200,10 @@ class EventOptions(object):
 class EventModelBase(MPTTModelBase):
     def __new__(meta, class_name, bases, class_dict):
         """
-        Create subclasses of MPTTModel. This:
-         - adds the MPTT fields to the class
-         - adds a TreeManager to the model
+        Create subclasses of EventModel. This:
+         - (via super) adds the MPTT fields to the class
+         - adds the EventManager to the model
+         - overrides MPTT's TreeManager to the model
         """
         event_opts = class_dict.pop('EventMeta', None)
         class_dict['_event_meta'] = EventOptions(event_opts)
@@ -234,7 +235,6 @@ class EventModelBase(MPTTModelBase):
             manager.contribute_to_class(cls, cls._mptt_meta.tree_manager_attr)
             setattr(cls, '_tree_manager', getattr(cls, cls._mptt_meta.tree_manager_attr))
 
-
         return cls
 
 
@@ -246,13 +246,27 @@ class EventModel(MPTTModel):
     class Meta:
         abstract = True
     
+    def update_endless_generators(self):
+    
+        
+        if hasattr(self, 'generators'):
+            endless_generators = self.generators.filter(rule__isnull=False, repeat_until__isnull=True)
+            [g.generate() for g in endless_generators]
+    
     def save(self, *args, **kwargs):
         self.cascade_changes_to_children()
+        self.update_endless_generators()
         return super(EventModel, self).save(*args, **kwargs)
                 
     @classmethod
     def Occurrence(cls):
         return cls.occurrences.related.model
+
+    @classmethod
+    def Generator(cls):
+        if hasattr(cls, 'generators'):
+            return cls.generators.related.model
+
         
     def reload(self):
         """
