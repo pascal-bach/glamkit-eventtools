@@ -77,7 +77,7 @@ class TestViews(AppTestCase):
     
         #doesn't matter how far back you go.
         r2 = self.client.get(url,  {'startdate':'2000-01-01'})
-        self.assertEqual(r.content, r2.content)
+        self.assertEqual(list(r.context['occurrence_pool']), list(r2.context['occurrence_pool']))
     
         #links
         o = r.context['occurrence_page'][0]

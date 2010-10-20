@@ -22,7 +22,7 @@ class TestOccurrences(AppTestCase):
     End datetime must be >= start datetime.
     """
     def test_occurrence_create(self):
-        e = Event.eventobjects.create(name="event with occurrences")
+        e = TestEvent.eventobjects.create(name="event with occurrences")
         
         d1 = date(2010,1,1)
         d2 = date(2010,1,2)
@@ -31,8 +31,7 @@ class TestOccurrences(AppTestCase):
         d2min = datetimeify(d2, clamp='min')
         d2max = datetimeify(d2, clamp='max')
         t1 = time(9,00)
-        t2 = time(10,00)
-        
+        t2 = time(10,00) 
         dt1 = datetime.combine(d1, t1)
         dt2 = datetime.combine(d2, t2)
         
@@ -72,7 +71,7 @@ class TestOccurrences(AppTestCase):
         self.assertRaises(TypeError, e.occurrences.create, **{'end':dt1})
         self.assertRaises(TypeError, e.occurrences.create, **{'end':d1})
         
-        #invalide start value
+        #invalid start value
         self.assertRaises(TypeError, e.occurrences.create, **{'start':t1})
         self.assertRaises(TypeError, e.occurrences.create, **{'start':t1, 'end':d1})
         self.assertRaises(TypeError, e.occurrences.create, **{'start':t1, 'end':dt1})
@@ -100,7 +99,7 @@ class TestOccurrences(AppTestCase):
         We can find out how long we have to wait until an occurrence starts.
         We can find out how long it has been since an occurrence finished.
         """
-        e = Event.eventobjects.create(name="event with occurrences")
+        e = TestEvent.eventobjects.create(name="event with occurrences")
         
         now = datetime.now()
         earlier = now - timedelta(seconds=600)
@@ -116,8 +115,8 @@ class TestOccurrences(AppTestCase):
         o = e.occurrences.create(start=dt1, end=dt2)
         o2 = e.occurrences.create(start=earlier, end=later)
 
-        self.ae(o.duration(), timedelta(days=1, seconds=3600))
-        self.ae(o.relative_duration(), relativedelta(days=1, hours=1))
+        self.ae(o.duration, timedelta(days=1, seconds=3600))
+        self.ae(o.relative_duration, relativedelta(days=1, hours=1))
         self.ae(o.timespan_description(), "1 January 2010, 9am until 10am on 2 January 2010")
 
         self.ae(o.has_finished, True)

@@ -1,10 +1,10 @@
-from models import Event, Occurrence
+from models import TestEvent, TestOccurrence
 from eventtools.views import EventViews
 from django.conf.urls.defaults import *
 
 class TestEventViews(EventViews):
-    occurrence_qs = Occurrence.objects.all()
-    event_qs = Event.eventobjects.all()
+    occurrence_qs = TestOccurrence.objects.all()
+    event_qs = TestEvent.eventobjects.all()
     
 views = TestEventViews()
     
