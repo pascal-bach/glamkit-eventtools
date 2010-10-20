@@ -34,8 +34,7 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
                 '',
                 url(r'(?P<parent_id>\d+)/create_child/',
                     self.admin_site.admin_view(self.create_child))
-                ) + super(MPTTModelAdmin, self).get_urls()
-            # warning: super skips a level here! Shouldn't matter?
+                ) + super(_EventAdmin, self).get_urls()
 
         def create_child(self, request, parent_id):
             parent = get_object_or_404(EventModel, id=parent_id)
