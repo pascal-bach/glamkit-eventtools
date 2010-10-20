@@ -1,14 +1,19 @@
 # −*− coding: UTF−8 −*−
-from dateutil import rrule
-from django.db import models
-from rule import Rule
-from nosj.fields import JSONField
-from django.utils.translation import ugettext, ugettext_lazy as _
-from eventtools.utils import datetimeify
-from datetime import date, time, datetime, timedelta
-from django.db import transaction
-from eventtools.conf import settings
+from django.db import models, transaction
 from django.db.models.base import ModelBase
+from django.utils.translation import ugettext, ugettext_lazy as _
+
+from dateutil import rrule
+
+from rule import Rule
+
+from nosj.fields import JSONField
+
+from eventtools.utils import datetimeify
+from eventtools.conf import settings
+from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
+
+from datetime import date, time, datetime, timedelta
 
 class GeneratorModel(models.Model):
     """
@@ -38,7 +43,7 @@ class GeneratorModel(models.Model):
         abstract = True
 
     def __unicode__(self):
-        return "Generator %s" % self.id
+        return "%s, %s" % (self.event, self.robot_description())
 
     def clean(self):
         if self.event_start > self.event_end:
@@ -49,6 +54,8 @@ class GeneratorModel(models.Model):
             raise ValidationError('repeat_until has no effect without a repetition rule')
         super(GeneratorModel, self).clean()
 
+    
+    @transaction.commit_on_success()
     def save(self, *args, **kwargs):
         generate = kwargs.pop('generate', True)
         
@@ -71,6 +78,59 @@ class GeneratorModel(models.Model):
         
         if self.repeat_until is not None and self.rule is None:
             raise AttributeError('repeat_until has no effect without a repetition rule')
+
+        """
+        When you change a generator and save it, it updates its existing occurrences according to the following:
+        
+        * If a repetition rule was changed:
+            don't try to update occurrences, but run generate() to make the new occurrences.
+            ie don't update anything, just generate
+        * If a repeat_until rule was changed:
+            don't try to delete out-of-bounds occurrences, but run generate() to make the new occurrences.
+            out-of-bounds occurrences are left behind.
+            ie update as normal
+            
+        * If start date (or datetime) was changed:
+            run the old rule, and timeshift all occurrences produced by the old rule.
+
+        * Else if only start time was changed:
+            update all the generator's occurrences that have the same start time.
+            
+        * If end date or (or datetime) was changed:
+            run the (new) generator and update the end date of all occurrences produced by the rule
+        
+        * If only end time was changed:
+            update all the generator's occurrences that have the same end time.
+        """
+        
+        if self.pk: #it already exists so could potentially be changed
+            saved_self = type(self).objects.get(pk=self.pk)
+            if self.rule == saved_self.rule:
+                start_shift = self.event_start - saved_self.event_start
+                end_shift = self.event_end - saved_self.event_end
+                duration = self.event_duration
+
+                if start_shift:
+                    if self.event_start.date() != saved_self.event_start.date(): # we're shifting days (and times)
+                        occurrence_set = self.occurrences.filter(start__in=list(saved_self.generate_dates()))
+                    elif self.event_start.time() != saved_self.event_start.time(): #we're only shifting times
+                        occurrence_set = [o for o in self.occurrences.all() if o.start.time() == saved_self.event_start.time()]
+
+                    for occ in occurrence_set:
+                        occ.start += start_shift
+                        occ.end = occ.start + duration
+                        occ.save()
+
+                elif end_shift: #only end has changed (both is covered above)            
+                    if self.event_end.date() != saved_self.event_end.date(): # we're shifting days (and times)
+                        occurrence_set = self.occurrences.filter(start__in=list(self.generate_dates()))
+                    elif self.event_end.time() != saved_self.event_end.time(): #we're only shifting times
+                        occurrence_set = [o for o in self.occurrences.all() if o.end.time() == saved_self.event_end.time()]
+
+                    for occ in occurrence_set:
+                        occ.end += end_shift
+                        occ.save()
+                
 
         super(GeneratorModel, self).save(*args, **kwargs)
         if generate:
@@ -101,44 +161,48 @@ class GeneratorModel(models.Model):
                     occ = self.occurrences.create(event=self.event, start=start, end=end) #generator = self
                     return occ
 
+    def generate_dates(self):
+        rule = self.rule.get_rrule(dtstart=self.event_start)
+        date_iter = iter(rule)
+        drop_dead_date = self.repeat_until or datetime.now() + settings.DEFAULT_GENERATOR_LIMIT
+        
+        while True:
+            d = date_iter.next()
+            if d > drop_dead_date:
+                break
+            yield d
+
     @transaction.commit_on_success()
     def generate(self):
         """
         generate my occurrences
         """
-                
+
         if self.rule is None: #the only occurrence in the village
             self.create_occurrence(start=self.event_start, end=self.event_end, honour_exceptions=True)
             return
 
-        rule = self.rule.get_rrule(dtstart=self.event_start)
-            
-        date_iter = iter(rule)
         event_duration = self.event_duration
-        drop_dead_date = self.repeat_until or datetime.now() + settings.DEFAULT_GENERATOR_LIMIT
-        
-        while True:
-            o_start = date_iter.next()
-            if o_start > drop_dead_date:
-                break
-            o_end = o_start + self.event_duration
+        for o_start in self.generate_dates():
+            o_end = o_start + event_duration
             self.create_occurrence(start=o_start, end=o_end, honour_exceptions=True)
 
-    # def robot_description(self):
-    #     if self.rule:
-    #         if self.repeat_until:
-    #             return "%s, repeating %s until %s" % (
-    #                 self.timespan.robot_description(),
-    #                 self.rule,
-    #                 pprint_date_span(self.repeat_until, self.repeat_until)
-    #             )
-    #         else:
-    #             return "%s, repeating %s" % (
-    #                 self.timespan.robot_description(),
-    #                 self.rule,
-    #             )
-    #     else:
-    #         return self.timespan.robot_description()
+    def robot_description(self):
+        if self.rule:
+            if self.repeat_until:
+                return "%s, repeating %s until %s" % (
+                    pprint_datetime_span(self.event_start, self.event_end),
+                    self.rule,
+                    pprint_date_span(self.repeat_until, self.repeat_until)
+                )
+            else:
+                return "%s, repeating %s" % (
+                    pprint_datetime_span(self.event_start, self.event_end),
+                    self.rule,
+                )
+        else:
+            return pprint_datetime_span(self.event_start, self.event_end),
+
     
     def is_exception(self, dt):
         if self.exceptions is None:

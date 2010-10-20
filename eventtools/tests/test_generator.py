@@ -7,6 +7,7 @@ from _fixture import generator_fixture
 from eventtools.utils import datetimeify
 from dateutil.relativedelta import relativedelta
 from django.core.urlresolvers import reverse
+from eventtools.models import Rule
 
 class TestGenerators(AppTestCase):
     
@@ -37,6 +38,8 @@ class TestGenerators(AppTestCase):
 
         Occurrences are saved to the database, and have an FK to the generator that did so. The FK can be set to None so
         that an occurrence can be detatched from a generator.
+        
+        Generators have a robot description.
         """
 
         # A generator without a rule generates one occurrence.
@@ -54,6 +57,8 @@ class TestGenerators(AppTestCase):
 
         #test dupes are not created.
         self.ae(self.dupe_weekly_generator.occurrences.count(), 0)
+
+        self.ae(self.weekly_generator.robot_description(), "1 January 2010, 10:30-11:30am, repeating weekly until 29 January 2010")
 
     def test_all_day(self):
         """
@@ -192,25 +197,163 @@ class TestGenerators(AppTestCase):
         bb3 = TestGOccurrence.objects.get(id=bb3_id)
         self.assertTrue(bb3 in self.weekly_generator.occurrences.all())
         self.ae(bb3.event, self.furniture_collection)
-        
+    
+    def _reset_generator_changes(self):
+        self.bin_night.occurrences.all().delete()
+        self.changeable_generator = self.bin_night.generators.create(
+            event_start=datetime(2010, 10, 1, 8, 30),
+            event_end=datetime(2010, 10, 1, 9, 30),
+            rule=self.weekly,
+            repeat_until=datetime(2010, 10, 8)
+        )
+        #freak occurrence
+        self.occ3 = self.changeable_generator.create_occurrence(start=datetime(2010, 10, 1, 13, 30), end=datetime(2010, 10, 1, 15, 30))
+
+        self.ae(self.changeable_generator.occurrences.count(), 3)
+        self.ae(self.changeable_generator.exceptions, {})
+        self.original_occurrences = list(self.changeable_generator.occurrences.all())
+        self.occ1 = self.original_occurrences[0] #freak one is [1]
+        self.occ2 = self.original_occurrences[2]
+        self.normal_occurrences = [self.occ1, self.occ2]
+
+    def test_changes(self):
         """
-        When you change a generator and update existing occurrences:
-          * we update the times of occurrences and exceptions to match the generator's times.
-          * we generate occurrences as normal.
-        This means that data is never lost except through an actual delete.
+        When you change a generator and save it, it updates existing occurrences according to the following:
+        
+        * If a repetition rule was changed:
+            don't try to update occurrences, but run generate() to make the new occurrences.
+        * If a repeat_until rule was changed:
+            don't try to delete out-of-bounds occurrences, but run generate() to make the new occurrences.
+            out-of-bounds occurrences are left behind.
+            ie do nothing special :-)
+            
+        * If start date (or datetime) was changed:
+            run the old rule, and timeshift all occurrences produced by the old rule.
 
+        * Else if only start time was changed:
+            update all the generator's occurrences that have the same start time.
+            
+        * If end date or (or datetime) was changed:
+            run the (new) generator and update the end date of all occurrences produced by the rule
+        
+        * If only end time was changed:
+            update all the generator's occurrences that have the same end time.
+        """
+        
+                
+        # let's change the timing and rule. The existing occurrences should be untouched.
+        self._reset_generator_changes()
+        daily = Rule.objects.create(frequency = "DAILY")
+        self.changeable_generator.event_start=datetime(2010, 9, 30, 10, 30)
+        self.changeable_generator.rule=daily
+        self.changeable_generator.save()    
+        new_occurrences = list(self.changeable_generator.occurrences.all())
+        self.ae(len(new_occurrences), 12)
+        for occ in self.normal_occurrences: #forget the freak one
+            self.assertTrue(occ in new_occurrences)
+            o = self.changeable_generator.occurrences.get(id=occ.id)
+            self.ae(o.start.time(), time(8,30))
+            self.ae(o.end.time(), time(9,30))
+        
+        # let's change the repeat_until rule to earlier. Nothing should be deleted.
+        self._reset_generator_changes()
+        self.changeable_generator.repeat_until = date(2010, 10, 1)
+        self.changeable_generator.save()
+        new_occurrences = list(self.changeable_generator.occurrences.all())
+        self.ae(len(new_occurrences), 3)
+        for occ in self.original_occurrences:
+            self.assertTrue(occ in new_occurrences)
+        
+        #let's change the start date/time
+        self._reset_generator_changes()
+        self.changeable_generator.event_start = datetime(2010, 9, 30, 8, 45)
+        self.changeable_generator.save()
+        #reload the original occurrences. The times should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.start, datetime(2010, 9, 30, 8, 45))
+        self.ae(occ2.start, datetime(2010, 10, 7, 8, 45))
+        #freak occurrence is unaffected
+        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
 
-        If the generator's datetimes are modified, it is possible to update occurrence datetimes (where unmodified).
-        If the generator's dates are modified, it is possible to update occurrence dates (where unmodified).
-        If the generator's times are modified, it is possible to update occurrence times (where unmodified).
-        If the generator is modified from being all-day to not all-day, it is possible to update (trivially).
-        If the generator is modified from being not all-day to all-day, it is possible to update (trivially).
+        #let's change the start time only, first tweaking an occurrence date.
+        self._reset_generator_changes()
+        #change occurrence date (not time) - we expect the time to be updated by the generator change.
+        self.occ1.start = datetime(2010, 9, 30, 8, 30)
+        self.occ1.save()
+        #change generator time (not date)
+        self.changeable_generator.event_start = datetime(2010, 10, 1, 8, 45)
+        self.changeable_generator.save()
+        #reload the original occurrences. The times should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.start, datetime(2010, 9, 30, 8, 45))
+        self.ae(occ2.start, datetime(2010, 10, 8, 8, 45))
+        #freak occurrence is unaffected
+        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
 
-        If a generator's rule is changed, then no times are changed (unless as above), and no occurrences are deleted but any 'extra' occurrences are still generated.
+        #let's change the end date/time
+        self._reset_generator_changes()
+        self.changeable_generator.event_end = datetime(2010, 10, 2, 9, 45)
+        self.changeable_generator.save()
+        #reload the original occurrences. The endtimes should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.end, datetime(2010, 10, 2, 9, 45))
+        self.ae(occ2.end, datetime(2010, 10, 9, 9, 45))
+        #freak occurrence is unaffected
+        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
+        
+        #let's change the end time only, first tweaking an occurrence date.
+        self._reset_generator_changes()
+        #change occurrence date (not time)
+        self.occ1.end = datetime(2010, 10, 3, 9, 30)
+        self.occ1.save()
+        #change generator time (not date)
+        self.changeable_generator.event_end = datetime(2010, 10, 1, 9, 45)
+        self.changeable_generator.save()
+        #reload the original occurrences. The times should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.end, datetime(2010, 10, 3, 9, 45))
+        self.ae(occ2.end, datetime(2010, 10, 8, 9, 45))
+        #freak occurrence is unaffected
+        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
 
-        If a generator's repeat until value is changed then then no times are changed (unless as above), and no occurrences are deleted, but any 'extra' occurrences are still generated.
-  
-        Generators have a robot description.
+        # if we change the rule so that times are shifted to match other occurrences then
+        # all occurrences are kept.
+        self._reset_generator_changes()
+        self.changeable_generator.event_start = self.occ3.start
+        self.changeable_generator.event_end = self.occ3.end
+        self.changeable_generator.save()
+        self.ae(self.changeable_generator.occurrences.count(), 3)
+        #reload the original occurrences. The times should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.start, datetime(2010, 10, 1, 13, 30))
+        self.ae(occ2.start, datetime(2010, 10, 8, 13, 30))
+        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
+        self.ae(occ1.end, datetime(2010, 10, 1, 15, 30))
+        self.ae(occ2.end, datetime(2010, 10, 8, 15, 30))
+        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
+        self.assertTrue(occ3.id != occ1.id)
+        
+        #now updates should affect occ3 as well
+        self.changeable_generator.event_start = datetime(2010, 9, 30, 13, 31)
+        self.changeable_generator.save()
+        #reload the original occurrences. The times should be updated.
+        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
+        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
+        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
+        self.ae(occ1.start, datetime(2010, 9, 30, 13, 31))
+        self.ae(occ2.start, datetime(2010, 10, 7, 13, 31))
+        self.ae(occ3.start, datetime(2010, 9, 30, 13, 31))
 
+        """
         TODO: We need a special admin widget for entering the datetimes.
         """
