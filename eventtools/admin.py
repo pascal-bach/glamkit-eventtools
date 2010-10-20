@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.conf.urls.defaults import patterns, url
 from django.core.urlresolvers import reverse
+from django.forms import ModelChoiceField
 import django
 from eventtools import adminviews
 
@@ -85,7 +86,16 @@ else:
         class _FeinCMSEventAdmin(EventAdmin(EventModel), TreeEditor):
             pass
         return _FeinCMSEventAdmin
-        
+
+
+class TreeModelChoiceField(ModelChoiceField):
+    """ ModelChoiceField which displays depth of objects within MPTT tree. """
+    def label_from_instance(self, obj):
+        super_label = \
+            super(TreeModelChoiceField, self).label_from_instance(obj)
+        return u"%s%s" % ("-"*obj.level, super_label)
+
+    
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
         list_display = ['__unicode__','start','end','event',]
@@ -95,7 +105,19 @@ def OccurrenceAdmin(OccurrenceModel):
         def __init__(self, *args, **kwargs):
             super(_OccurrenceAdmin, self).__init__(*args, **kwargs)
             self.event_model = self.model.event.field.rel.to
-        
+
+        def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
+            # override choices and form class for event field
+            if db_field.name == 'event':
+                # use TreeModelChoiceField in all views
+                kwargs['form_class'] = TreeModelChoiceField
+                if request and hasattr(request, '_event'):
+                    # limit event choices in changelist
+                    kwargs['queryset'] = request._event.get_descendants()
+                return db_field.formfield(**kwargs)
+            return super(_OccurrenceAdmin, self).formfield_for_foreignkey(
+                db_field, request, **kwargs)
+
         def changelist_view(self, request, extra_context=None):
             if 'event_id' in request.GET:
                 request._event = get_object_or_404(
@@ -114,12 +136,21 @@ def OccurrenceAdmin(OccurrenceModel):
             return super(_OccurrenceAdmin, self).changelist_view(
                 request, extra_context)
 
-        def queryset(self, request):
-            queryset = super(_OccurrenceAdmin, self).queryset(request)
+        def _get_event_ids(self, request):
+            # includes a little bit of caching
             if hasattr(request, '_event'):
-                event_ids = request._event.get_descendants().values_list(
-                    'id', flat=True)
-                queryset = queryset.filter(event__id__in=event_ids)
+                if not hasattr(request, '_event_ids'):
+                    descendants = request._event.get_descendants()
+                    request._event_ids = \
+                        descendants.values_list('id', flat=True)
+                return request._event_ids
+            return None
+
+        def queryset(self, request):
+            # limit to occurrences of descendents of request._event, if set
+            queryset = super(_OccurrenceAdmin, self).queryset(request)
+            if self._get_event_ids(request):
+                queryset = queryset.filter(event__id__in=request._event_ids)
             return queryset
 
     return _OccurrenceAdmin
