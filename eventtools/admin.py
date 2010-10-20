@@ -2,7 +2,9 @@ from django.contrib import admin
 from mptt.admin import MPTTModelAdmin
 from diff import generate_diff
 from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
 from django.conf.urls.defaults import patterns, url
+from django.core.urlresolvers import reverse
 import django
 from eventtools import adminviews
 
@@ -14,10 +16,25 @@ create_children.short_description = "Create children of selected events"
 
 def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use this admin.
     class _EventAdmin(MPTTModelAdmin):
+        list_display = ('__unicode__', 'occurrence_link')
         actions = [create_children]
         exclude = ['parent']
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
+
+        def __init__(self, *args, **kwargs):
+            super(_EventAdmin, self).__init__(*args, **kwargs)
+            self.occurrence_model = self.model.occurrences.related.model
+        
+        def occurrence_link(self, event):
+            return '<a href="%s?event_id=%d">View Occurrences</a>' % (
+                reverse("%s:%s_%s_changelist" % (
+                        self.admin_site.name,
+                        self.occurrence_model._meta.app_label,
+                        self.occurrence_model._meta.module_name)), event.id)
+                
+        occurrence_link.short_description = 'Occurrences'
+        occurrence_link.allow_tags = True
         
         # list_display = ('title', 'edit_occurrences_link', 'all_occurrences_count', 'my_occurrences_count')
 
@@ -74,4 +91,35 @@ def OccurrenceAdmin(OccurrenceModel):
         list_display = ['__unicode__','start','end','event',]
         list_editable = ['start','end','event',]
         # list_filter = ['event',]
+
+        def __init__(self, *args, **kwargs):
+            super(_OccurrenceAdmin, self).__init__(*args, **kwargs)
+            self.event_model = self.model.event.field.rel.to
+        
+        def changelist_view(self, request, extra_context=None):
+            if 'event_id' in request.GET:
+                request._event = get_object_or_404(
+                    self.event_model, id=request.GET['event_id'])
+                # remove from immutable GET, or use a proper url?
+                GET = request.GET.copy()
+                GET.pop('event_id')
+                request.GET = GET
+            else:
+                messages.info(
+                    request, "Occurrences can only be accessed via events.")
+                return redirect("%s:%s_%s_changelist" % (
+                        self.admin_site.name, self.event_model._meta.app_label,
+                        self.event_model._meta.module_name))
+
+            return super(_OccurrenceAdmin, self).changelist_view(
+                request, extra_context)
+
+        def queryset(self, request):
+            queryset = super(_OccurrenceAdmin, self).queryset(request)
+            if hasattr(request, '_event'):
+                event_ids = request._event.get_descendants().values_list(
+                    'id', flat=True)
+                queryset = queryset.filter(event__id__in=event_ids)
+            return queryset
+
     return _OccurrenceAdmin
