@@ -17,3 +17,6 @@ OCCURRENCES_PER_PAGE = 20
 
 ICAL_CALNAME = getattr(settings, 'SITE_NAME', 'Events list')
 ICAL_CALDESC = "Events listing" #e.g. "Events listing from mysite.com"
+
+from dateutil.relativedelta import relativedelta
+DEFAULT_GENERATOR_LIMIT = relativedelta(years=1) #months=6, etc
