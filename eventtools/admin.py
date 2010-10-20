@@ -1,6 +1,8 @@
 from django.contrib import admin
 from mptt.admin import MPTTModelAdmin
 from diff import generate_diff
+from django.shortcuts import get_object_or_404, redirect
+from django.conf.urls.defaults import patterns, url
 import django
 from eventtools import adminviews
 
@@ -26,7 +28,22 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
         #         # url(r'^(?P<event_id>\d+)/create_exception/(?P<gen_id>\d+)/(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})/(?P<hour>\d{1,2})-(?P<minute>\d{1,2})-(?P<second>\d{1,2})/$', self.admin_site.admin_view(make_exceptional_occurrence), {'modeladmin': self}),
         #     )
         #     return my_urls + super_urls
-    
+
+        def get_urls(self):
+            return patterns(
+                '',
+                url(r'(?P<parent_id>\d+)/create_child/',
+                    self.admin_site.admin_view(self.create_child))
+                ) + super(MPTTModelAdmin, self).get_urls()
+            # warning: super skips a level here! Shouldn't matter?
+
+        def create_child(self, request, parent_id):
+            parent = get_object_or_404(EventModel, id=parent_id)
+            child = EventModel._default_manager.create(parent=parent)
+            return redirect("%s:%s_%s_change" % (
+                    self.admin_site.name, EventModel._meta.app_label,
+                    EventModel._meta.module_name), child.id)
+        
         def change_view(self, request, object_id, extra_context=None):
             obj = EventModel._event_manager.get(pk=object_id)
 
