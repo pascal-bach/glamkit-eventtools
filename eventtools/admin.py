@@ -5,7 +5,11 @@ from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.conf.urls.defaults import patterns, url
 from django.core.urlresolvers import reverse
-from django.forms import ModelChoiceField
+from django.core import validators
+from django.core.exceptions import ValidationError
+import datetime
+from django import forms
+from django.db import models
 import django
 from eventtools import adminviews
 
@@ -88,14 +92,44 @@ else:
         return _FeinCMSEventAdmin
 
 
-class TreeModelChoiceField(ModelChoiceField):
+class TreeModelChoiceField(forms.ModelChoiceField):
     """ ModelChoiceField which displays depth of objects within MPTT tree. """
     def label_from_instance(self, obj):
         super_label = \
             super(TreeModelChoiceField, self).label_from_instance(obj)
         return u"%s%s" % ("-"*obj.level, super_label)
 
+
+class DateAndMaybeTimeField(forms.SplitDateTimeField):
+    """ Allow blank time; default to 00:00 / 23:59 (based on field label) """
+
+    widget = admin.widgets.AdminSplitDateTime
     
+    def clean(self, value):
+        """ Override to make the TimeField not required. """
+        try:
+            return super(DateAndMaybeTimeField, self).clean(value)
+        except ValidationError, error:
+            if error.messages == [self.error_messages['required']]:
+                if value[0] not in validators.EMPTY_VALUES:
+                    out = self.compress([self.fields[0].clean(value[0]), None])
+                    self.validate(out)
+                    return out
+            raise
+                    
+    def compress(self, data_list):
+        if data_list:
+            if data_list[0] in validators.EMPTY_VALUES:
+                raise ValidationError(self.error_messages['invalid_date'])
+            if data_list[1] in validators.EMPTY_VALUES:
+                if self.label.lower().count('end'):
+                    data_list[1] = datetime.time(23,59)
+                else:
+                    data_list[1] = datetime.time()
+            return datetime.datetime.combine(*data_list)
+        return None
+
+
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
         list_display = ['__unicode__','start','end','event',]
@@ -107,6 +141,10 @@ def OccurrenceAdmin(OccurrenceModel):
             super(_OccurrenceAdmin, self).__init__(*args, **kwargs)
             self.event_model = self.model.event.field.rel.to
 
+        formfield_overrides = {
+            models.DateTimeField: {'form_class':DateAndMaybeTimeField},
+            }
+            
         def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
             # override choices and form class for event field
             if db_field.name == 'event':
