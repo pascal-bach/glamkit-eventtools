@@ -26,6 +26,7 @@ background:#BBFFBB none repeat scroll 0 0;
 {% block object-tools %}
 
 {{ block.super }}
+<p><a href="create_child/">[ Create child ]</a></p>
 
 	{% if object.id %}
 		{% drilldown_tree_for_node object as drilldown %}	
