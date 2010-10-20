@@ -101,7 +101,8 @@ def OccurrenceAdmin(OccurrenceModel):
         list_display = ['__unicode__','start','end','event',]
         list_editable = ['start','end','event',]
         # list_filter = ['event',]
-
+        change_list_template = 'admin/eventtools/occurrence_list.html'
+        
         def __init__(self, *args, **kwargs):
             super(_OccurrenceAdmin, self).__init__(*args, **kwargs)
             self.event_model = self.model.event.field.rel.to
@@ -132,7 +133,8 @@ def OccurrenceAdmin(OccurrenceModel):
                 return redirect("%s:%s_%s_changelist" % (
                         self.admin_site.name, self.event_model._meta.app_label,
                         self.event_model._meta.module_name))
-
+            extra_context = extra_context or {}
+            extra_context['root_event'] = request._event
             return super(_OccurrenceAdmin, self).changelist_view(
                 request, extra_context)
 
