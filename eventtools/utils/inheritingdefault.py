@@ -12,7 +12,7 @@ class ModelInstanceAwareDefault():
     def __init__(self, attr, old_default=None):
         self.attr = attr
         self.old_default = old_default
-        
+
     def has_old_default(self):
         "Returns a boolean of whether this field has a default value."
         return self.old_default is not NOT_PROVIDED
@@ -31,12 +31,15 @@ class ModelInstanceAwareDefault():
 
     def __call__(self):
         # it would be so awesome if django passed the field/instance in question to the default callable.
-        # since it doesn't, let's grab it with voodoo.        
+        # since it doesn't, let's grab it with voodoo.
         frame = inspect.currentframe().f_back
-        field = frame.f_locals['self']
+        field = frame.f_locals.get('self', None)
 
         parent = None
-        frame = frame.f_back
+        if field:
+            frame = frame.f_back
+        else:
+            frame = None
         while frame is not None:
             if frame.f_locals.has_key('kwargs'):
                 modelbasekwargs = frame.f_locals['kwargs']
