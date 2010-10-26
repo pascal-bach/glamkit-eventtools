@@ -2,7 +2,7 @@
 python-dateutil
 vobject
 glamkit
--e git+git://github.com/bradjasper/django-jsonfield.git#egg=jsonfield
+-e git+git://github.com/ixc/django-jsonfield.git#egg=jsonfield
 
 #optionally
 feincms
