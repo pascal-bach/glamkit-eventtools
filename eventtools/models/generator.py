@@ -46,6 +46,9 @@ class GeneratorModel(models.Model):
         return "%s, %s" % (self.event, self.robot_description())
 
     def clean(self):
+        if self.event_end is None:
+            self.event_end = self.event_start
+        
         if self.event_start > self.event_end:
             raise ValidationError('start must be earlier than end')
         if self.repeat_until is not None and self.repeat_until < self.event_end:
