@@ -25,12 +25,13 @@ background:#BBFFBB none repeat scroll 0 0;
 {% endblock %}
 
 {% block object-tools %}
-
-{{ block.super }}
-<p>
- <a href="create_child/">[ Create child event ]</a>
- <a href="{{ occurrences_url }}">[ View occurrences ]</a>
-</p>
+  {{ block.super }}
+  {% if original %}
+    <p>
+       <a href="create_child/">[ Create child event ]</a>
+       <a href="{{ occurrences_url }}">[ View occurrences ]</a>
+    </p>
+  {% endif %}
 
 	{% if object.id %}
 		{% drilldown_tree_for_node object as drilldown %}	
