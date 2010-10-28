@@ -396,6 +396,9 @@ class OccurrenceModel(models.Model):
         ordering = ('start', 'end',)
 
     def clean(self):
+        if self.end is None:
+            self.end = self.start
+        
         if self.start > self.end:
             raise ValidationError('start must be earlier than end')
         super(OccurrenceModel, self).clean()
@@ -414,7 +417,7 @@ class OccurrenceModel(models.Model):
         
         #if my time is being changed, or if i'm being detatched from the generator, add the old time to the generator's exceptions.
         #TODO: add the new time if self.start is in exceptions and durations are equal
-        if hasattr(self, 'generator') and self.pk:
+        if getattr(self, 'generator', None) and self.pk:
             saved_self = type(self).objects.get(pk=self.pk)
             if self.generator != saved_self.generator or self.start != saved_self.start or self.end != saved_self.end:
                 saved_self.generator.add_exception(saved_self.start)
