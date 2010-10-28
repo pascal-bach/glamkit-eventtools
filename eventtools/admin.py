@@ -173,10 +173,19 @@ def OccurrenceAdmin(OccurrenceModel):
                     name="%s_%s_changelist_for_event" % (
                         OccurrenceModel._meta.app_label,
                         OccurrenceModel._meta.module_name)),
-                # workaround fix for "../" links in changelist template
+                # workaround fix for "../" links in changelist breadcrumbs
                 url(r'for_event/$',
                     self.admin_site.admin_view(self.changelist_view)),
+                # and since relative URLs are used on changelist:
+                url(r'for_event/(?P<event_id>\d+)/(?P<object_id>\d+)/$',
+                    self.redirect_to_change_view),
                 ) + super(_OccurrenceAdmin, self).get_urls()
+
+        def redirect_to_change_view(self, request, event_id, object_id):
+            return redirect('%s:%s_%s_change' % (
+                    self.admin_site.name,
+                    OccurrenceModel._meta.app_label,
+                    OccurrenceModel._meta.module_name), object_id)
 
         def changelist_view(self, request, event_id=None, extra_context=None):
             if event_id:
