@@ -32,11 +32,12 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
             self.occurrence_model = self.model.occurrences.related.model
         
         def occurrence_link(self, event):
-            return '<a href="%s?event_id=%d">View Occurrences</a>' % (
-                reverse("%s:%s_%s_changelist" % (
+            return '<a href="%s">View Occurrences</a>' % (
+                reverse("%s:%s_%s_changelist_for_event" % (
                         self.admin_site.name,
                         self.occurrence_model._meta.app_label,
-                        self.occurrence_model._meta.module_name)), event.id)
+                        self.occurrence_model._meta.module_name),
+                        args=(event.id,)))
                 
         occurrence_link.short_description = 'Occurrences'
         occurrence_link.allow_tags = True
@@ -157,14 +158,23 @@ def OccurrenceAdmin(OccurrenceModel):
             return super(_OccurrenceAdmin, self).formfield_for_foreignkey(
                 db_field, request, **kwargs)
 
-        def changelist_view(self, request, extra_context=None):
-            if 'event_id' in request.GET:
+        def get_urls(self):
+            return patterns(
+                '',
+                url(r'for_event/(?P<event_id>\d+)/$',
+                    self.admin_site.admin_view(self.changelist_view),
+                    name="%s_%s_changelist_for_event" % (
+                        OccurrenceModel._meta.app_label,
+                        OccurrenceModel._meta.module_name)),
+                # workaround fix for "../" links in changelist template
+                url(r'for_event/$',
+                    self.admin_site.admin_view(self.changelist_view)),
+                ) + super(_OccurrenceAdmin, self).get_urls()
+
+        def changelist_view(self, request, event_id=None, extra_context=None):
+            if event_id:
                 request._event = get_object_or_404(
-                    self.event_model, id=request.GET['event_id'])
-                # remove from immutable GET, or use a proper url?
-                GET = request.GET.copy()
-                GET.pop('event_id')
-                request.GET = GET
+                    self.event_model, id=event_id)
             else:
                 messages.info(
                     request, "Occurrences can only be accessed via events.")
