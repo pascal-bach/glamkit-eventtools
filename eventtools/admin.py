@@ -226,3 +226,13 @@ def OccurrenceAdmin(OccurrenceModel):
             return queryset
 
     return _OccurrenceAdmin
+
+
+def GeneratorInline(GeneratorModel):
+    class _GeneratorInline(admin.TabularInline):
+        model = GeneratorModel
+        extra = 1
+        formfield_overrides = {
+            models.DateTimeField: {'form_class': DateAndMaybeTimeField},
+            }        
+    return _GeneratorInline
