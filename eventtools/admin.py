@@ -74,10 +74,17 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
             else:
                 fields_diff = None
 
-            extra_context = {'fields_diff': fields_diff,
-                             'django_version': django.get_version()[:3],
-                             'object': obj,
-                             }
+            extra_context = {
+                'fields_diff': fields_diff,
+                'django_version': django.get_version()[:3],
+                'object': obj,
+                'occurrences_url':
+                    reverse('%s:%s_%s_changelist_for_event' % (
+                        self.admin_site.name,
+                        self.occurrence_model._meta.app_label,
+                        self.occurrence_model._meta.module_name),
+                            args=(object_id,)),
+                }
                          
             return super(_EventAdmin, self).change_view(request, object_id, extra_context)
     return _EventAdmin
@@ -183,6 +190,12 @@ def OccurrenceAdmin(OccurrenceModel):
                         self.event_model._meta.module_name))
             extra_context = extra_context or {}
             extra_context['root_event'] = request._event
+            extra_context['root_event_change_url'] = reverse(
+                '%s:%s_%s_change' % (
+                    self.admin_site.name,
+                    self.event_model._meta.app_label,
+                    self.event_model._meta.module_name),
+                args=(event_id,))
             return super(_OccurrenceAdmin, self).changelist_view(
                 request, extra_context)
 
