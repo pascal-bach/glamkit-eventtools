@@ -19,7 +19,7 @@ class EventViews(object):
         return patterns('',
             url(r'^$', self.occurrence_list, name='occurrence_list'),
             url(r'^event/(?P<event_slug>[-\w]+)/$', self.event, name='event'),
-            url(r'^(?P<occurrence_id>\d+)/?$', self.occurrence, name="occurrence"), #canonical URL for collection item.
+            url(r'^(?P<occurrence_id>\d+)/?$', self.occurrence, name="occurrence"), #canonical URL for occurrence.
             url(r'^(?P<occurrence_id>\d+)(?P<ignored_part>\+.*)/?$', self.occurrence),
         
             # #ical
