@@ -66,15 +66,14 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
                     self.admin_site.name, EventModel._meta.app_label,
                     EventModel._meta.module_name), child.id)
         
-        def change_view(self, request, object_id, extra_context=None):
+        def change_view(self, request, object_id, extra_context={}):
             obj = EventModel._event_manager.get(pk=object_id)
 
             if obj.parent:
                 fields_diff = generate_diff(obj.parent, obj, include=EventModel._event_meta.fields_to_inherit)
             else:
                 fields_diff = None
-
-            extra_context = {
+            extra_extra_context = {
                 'fields_diff': fields_diff,
                 'django_version': django.get_version()[:3],
                 'object': obj,
@@ -85,7 +84,7 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
                         self.occurrence_model._meta.module_name),
                             args=(object_id,)),
                 }
-                         
+            extra_context.update(extra_extra_context)      
             return super(_EventAdmin, self).change_view(request, object_id, extra_context)
     return _EventAdmin
 
