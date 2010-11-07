@@ -1,7 +1,7 @@
 -e git+http://github.com/matthiask/django-mptt.git#egg=mptt
 python-dateutil
 vobject
-glamkit
+glamkit-convenient
 -e git+git://github.com/ixc/django-jsonfield.git#egg=jsonfield
 
 #optionally
