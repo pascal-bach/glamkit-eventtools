@@ -192,17 +192,20 @@ class GeneratorModel(models.Model):
 
     def robot_description(self):
         if self.rule:
-            if self.repeat_until:
-                return "%s, repeating %s until %s" % (
-                    pprint_datetime_span(self.event_start, self.event_end),
-                    self.rule,
-                    pprint_date_span(self.repeat_until, self.repeat_until)
-                )
+            if self.occurrences.count() > 3:
+                if self.repeat_until:
+                    return "%s, repeating %s until %s" % (
+                        pprint_datetime_span(self.event_start, self.event_end),
+                        self.rule,
+                        pprint_date_span(self.repeat_until, self.repeat_until)
+                    )
+                else:
+                    return "%s, repeating %s" % (
+                        pprint_datetime_span(self.event_start, self.event_end),
+                        self.rule,
+                    )
             else:
-                return "%s, repeating %s" % (
-                    pprint_datetime_span(self.event_start, self.event_end),
-                    self.rule,
-                )
+                return _("\n ").join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
         else:
             return pprint_datetime_span(self.event_start, self.event_end),
 

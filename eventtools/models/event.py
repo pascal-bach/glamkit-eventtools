@@ -3,11 +3,13 @@ from django.db.models.base import ModelBase
 from django.db.models.fields import FieldDoesNotExist
 from django.db.models import Count
 from django.core.urlresolvers import reverse
+from django.utils.translation import ugettext, ugettext_lazy as _
 
 from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault
+from eventtools.utils.pprint_timespan import pprint_datetime_span
 
 class EventQuerySet(models.query.QuerySet):
     def occurrences(self, *args, **kwargs):
@@ -237,7 +239,6 @@ class EventModelBase(MPTTModelBase):
 
         return cls
 
-
 class EventModel(MPTTModel):
     __metaclass__ = EventModelBase
     
@@ -334,3 +335,6 @@ class EventModel(MPTTModel):
         
     def get_absolute_url(self):
         return reverse('event', kwargs={'event_slug': self.slug })
+        
+    def robot_description(self):
+        return _("\n ").join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
