@@ -415,9 +415,9 @@ class OccurrenceModel(models.Model):
         if self.start > self.end:
             raise AttributeError('start must be earlier than end')
         
-        #if my time is being changed, or if i'm being detatched from the generator, add the old time to the generator's exceptions.
+        #if my time is being changed, or if i'm being detached from the generator, add the old time to the generator's exceptions.
         #TODO: add the new time if self.start is in exceptions and durations are equal
-        if getattr(self, 'generator', None) and self.pk:
+        if hasattr(self, 'generator') and self.pk:
             saved_self = type(self).objects.get(pk=self.pk)
             if self.generator != saved_self.generator or self.start != saved_self.start or self.end != saved_self.end:
                 saved_self.generator.add_exception(saved_self.start)
