@@ -1,7 +1,10 @@
-from django.test import TestCase
-from django.conf import settings
 from django.db.models.loading import load_app
+from django.conf import settings
 from django.core.management import call_command
+from django.template.loaders import app_directories
+from django.template import loader
+from django.test import TestCase
+
 from _fixture import fixture
 
 APP_NAME = 'eventtools.tests.eventtools_testapp'
@@ -21,8 +24,22 @@ class TestCaseWithApp(TestCase):
         call_command('flush', verbosity=0, interactive=False)
         call_command('syncdb', verbosity=0, interactive=False)
         self.ae = self.assertEqual
+        self._old_template_loaders = settings.TEMPLATE_LOADERS
+        loaders = list(settings.TEMPLATE_LOADERS)
+        try:
+            loaders.remove('django.template.loaders.filesystem.Loader')
+            settings.TEMPLATE_LOADERS = loaders
+            self._refresh_cache()
+        except ValueError:
+                pass
         fixture(self)
         
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_INSTALLED_APPS
         settings.ROOT_URLCONF = self._old_root_urlconf
+        settings.TEMPLATE_LOADERS = self._old_template_loaders
+        self._refresh_cache()
+    
+    def _refresh_cache(self):
+        reload(app_directories)
+        loader.template_source_loaders = None
