@@ -22,7 +22,7 @@ class TestOccurrences(AppTestCase):
     End datetime must be >= start datetime.
     """
     def test_occurrence_create(self):
-        e = TestEvent.eventobjects.create(name="event with occurrences")
+        e = ExampleEvent.eventobjects.create(name="event with occurrences")
         
         d1 = date(2010,1,1)
         d2 = date(2010,1,2)
@@ -99,7 +99,7 @@ class TestOccurrences(AppTestCase):
         We can find out how long we have to wait until an occurrence starts.
         We can find out how long it has been since an occurrence finished.
         """
-        e = TestEvent.eventobjects.create(name="event with occurrences")
+        e = ExampleEvent.eventobjects.create(name="event with occurrences")
         
         now = datetime.now()
         earlier = now - timedelta(seconds=600)
@@ -150,4 +150,3 @@ If you wish to override this behavior, simply write a custom action which accomp
 
 For more background on bulk deletion, see the documentation on object deletion.
 """
-

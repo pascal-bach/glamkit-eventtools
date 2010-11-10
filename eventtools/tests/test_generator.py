@@ -194,7 +194,7 @@ class TestGenerators(AppTestCase):
         
         #but also that it doesn't get regenerated.
         self.weekly_generator.generate()
-        bb3 = TestGOccurrence.objects.get(id=bb3_id)
+        bb3 = ExampleGOccurrence.objects.get(id=bb3_id)
         self.assertTrue(bb3 in self.weekly_generator.occurrences.all())
         self.ae(bb3.event, self.furniture_collection)
     

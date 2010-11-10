@@ -1,52 +1,52 @@
-from eventtools_testapp.models import *
-from datetime import datetime, date, timedelta
 from dateutil.relativedelta import *
-from eventtools.utils.dateranges import *
 from eventtools.models import Rule
+from eventtools_testapp.models import *
+from eventtools.utils.dateranges import *
+from datetime import datetime, date, timedelta
 
 def fixture(obj):
-    obj.gallery = TestVenue.objects.create(name="Gallery A", slug="gallery-A")
-    obj.auditorium = TestVenue.objects.create(name="Auditorium", slug="auditorium")
-    obj.cinema_1 = TestVenue.objects.create(name="Cinema 1", slug="cinema-1")
-    obj.cinema_2 = TestVenue.objects.create(name="Cinema 2", slug="cinema-2")
+    obj.gallery = ExampleVenue.objects.create(name="Gallery A", slug="gallery-A")
+    obj.auditorium = ExampleVenue.objects.create(name="Auditorium", slug="auditorium")
+    obj.cinema_1 = ExampleVenue.objects.create(name="Cinema 1", slug="cinema-1")
+    obj.cinema_2 = ExampleVenue.objects.create(name="Cinema 2", slug="cinema-2")
     
     #some simple events
-    obj.talk = TestEvent.eventobjects.create(name="Curator's Talk", venue=obj.gallery)
-    obj.performance = TestEvent.eventobjects.create(name="A performance", venue=obj.auditorium)
+    obj.talk = ExampleEvent.eventobjects.create(name="Curator's Talk", venue=obj.gallery)
+    obj.performance = ExampleEvent.eventobjects.create(name="A performance", venue=obj.auditorium)
     
     #some useful dates
     obj.day1 = date(2010,10,10)
     obj.day2 = obj.day1+timedelta(1)
 
     #some simple occurrences
-    obj.talk_morning = TestOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,10,10,00))
-    obj.talk_afternoon = TestOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,10,14,00))
-    obj.talk_tomorrow_morning_cancelled = TestOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,11,10,00), status='cancelled')
+    obj.talk_morning = ExampleOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,10,10,00))
+    obj.talk_afternoon = ExampleOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,10,14,00))
+    obj.talk_tomorrow_morning_cancelled = ExampleOccurrence.objects.create(event=obj.talk, start=datetime(2010,10,11,10,00), status='cancelled')
 
-    obj.performance_evening = TestOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,10,20,00))
-    obj.performance_tomorrow = TestOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,11,20,00))
-    obj.performance_day_after_tomorrow = TestOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,12,20,00))
+    obj.performance_evening = ExampleOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,10,20,00))
+    obj.performance_tomorrow = ExampleOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,11,20,00))
+    obj.performance_day_after_tomorrow = ExampleOccurrence.objects.create(event=obj.performance, start=datetime(2010,10,12,20,00))
 
     #an event with many occurrences
     # deleting the 2nd jan, because we want to test it isn't displayed
-    obj.daily_tour = TestEvent.eventobjects.create(name="Daily Tour", slug="daily-tour")
+    obj.daily_tour = ExampleEvent.eventobjects.create(name="Daily Tour", slug="daily-tour")
     for day in range(50):
         if day !=1: #2nd of month.
             d = date(2010,1,1) + timedelta(day)
             obj.daily_tour.occurrences.create(start=d)
 
 
-    obj.weekly_talk = TestEvent.eventobjects.create(name="Weekly Talk", slug="weekly-talk")
+    obj.weekly_talk = ExampleEvent.eventobjects.create(name="Weekly Talk", slug="weekly-talk")
     for day in range(50):
         d = date(2010,1,1) + timedelta(day*7)
         obj.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
 
 
     #an event with some variations
-    obj.film = TestEvent.eventobjects.create(name="Film Night", venue=obj.cinema_1)
-    obj.film_with_popcorn = TestEvent.eventobjects.create(parent=obj.film, name="Film Night", difference_from_parent="free popcorn", venue=obj.cinema_1)
-    obj.film_with_talk = TestEvent.eventobjects.create(parent=obj.film, name="Film Night", difference_from_parent="director's talk", venue=obj.auditorium)
-    obj.film_with_talk_and_popcorn = TestEvent.eventobjects.create(parent=obj.film_with_talk, name="Film Night", difference_from_parent="popcorn and director's talk", venue=obj.cinema_2)
+    obj.film = ExampleEvent.eventobjects.create(name="Film Night", venue=obj.cinema_1)
+    obj.film_with_popcorn = ExampleEvent.eventobjects.create(parent=obj.film, name="Film Night", difference_from_parent="free popcorn", venue=obj.cinema_1)
+    obj.film_with_talk = ExampleEvent.eventobjects.create(parent=obj.film, name="Film Night", difference_from_parent="director's talk", venue=obj.auditorium)
+    obj.film_with_talk_and_popcorn = ExampleEvent.eventobjects.create(parent=obj.film_with_talk, name="Film Night", difference_from_parent="popcorn and director's talk", venue=obj.cinema_2)
     
     # obj.film_with_popcorn.move_to(obj.film, position='first-child')
     # obj.film_with_talk.move_to(obj.film, position='first-child')
@@ -63,7 +63,7 @@ def fixture(obj):
 def generator_fixture(obj):
     #TestEvents with generators (separate models to test well)
     obj.weekly = Rule.objects.create(frequency = "WEEKLY")
-    obj.bin_night = TestGEvent.eventobjects.create(name='Bin Night')
+    obj.bin_night = ExampleGEvent.eventobjects.create(name='Bin Night')
     obj.one_off_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,2,10,30), event_end=datetime(2010,1,2,11,30))
     obj.weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,1,10,30), event_end=datetime(2010,1,1,11,30), rule=obj.weekly, repeat_until=date(2010,1,29))
     obj.endless_generator = obj.bin_night.generators.create(event=obj.bin_night, event_start=datetime(2010,1,3,10,30), event_end=datetime(2010,1,3,11,30), rule=obj.weekly)
@@ -71,7 +71,7 @@ def generator_fixture(obj):
     #this should create 0 occurrences, since it is a duplicate of weekly.
     obj.dupe_weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,1,10,30), event_end=datetime(2010,1,1,11,30), rule=obj.weekly, repeat_until=date(2010,1,29))
 
-    obj.furniture_collection = TestGEvent.eventobjects.create(name='Furniture Collection Day')
+    obj.furniture_collection = ExampleGEvent.eventobjects.create(name='Furniture Collection Day')
     
 def reload_films(obj):
     obj.film = obj.film.reload()
@@ -82,7 +82,7 @@ def reload_films(obj):
 
 def bigfixture(obj):
     # have to create some more events since we are working from 'today'.
-    obj.pe = TestEvent.eventobjects.create(name="proliferating event")
+    obj.pe = ExampleEvent.eventobjects.create(name="proliferating event")
 
     obj.todaynow = datetime.now()
 
