@@ -337,4 +337,4 @@ class EventModel(MPTTModel):
         return reverse('event', kwargs={'event_slug': self.slug })
         
     def robot_description(self):
-        return _("\n ").join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
+        return _("\n ").join([gen.robot_description() for gen in self.generators.all()])
