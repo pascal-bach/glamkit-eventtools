@@ -9,13 +9,16 @@ from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
 from eventtools.utils import dateranges
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
+from django.utils.dateformat import format
 
-from datetime import date, time, datetime
+
+from datetime import date, time, datetime, timedelta
 
 from dateutil import parser as dateparser
 from dateutil.relativedelta import relativedelta
 
 from vobject.base import backslashEscape
+from django.utils.translation import ugettext as _
 
 
 class OccurrenceQuerySetFN(object):
@@ -521,6 +524,16 @@ class OccurrenceModel(models.Model):
     def start_date(self):
         return self.start.date()
 
+    def humanised_day(self):
+        if self.start.date() == date.today():
+            return _("Today")
+        elif self.start.date() == date.today() + timedelta(days=1):
+            return _("Tomorrow")
+        elif self.start.date() < date.today() + timedelta(days=7):
+            return format(self.start, "l")
+        else:
+            return format(self.start, "m d")
+        
         
     def get_absolute_url(self):
         return reverse('occurrence', kwargs={'occurrence_id': self.id })
