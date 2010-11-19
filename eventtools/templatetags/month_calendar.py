@@ -10,7 +10,7 @@ from eventtools.models import EventModel
 
 register = template.Library()
 
-def month_calendar(context, events_pool=[], month=None, show_header=True, selected_start=None, selected_end=None, week_start=None, strip_empty_weeks=None):
+def month_calendar(context, events_pool=[], month=None, show_header=True, selected_start=None, selected_end=None, week_start=None, strip_empty_weeks=None, base_link='', get_args=''):
     """
     Creates a configurable html calendar displaying one month
     
@@ -90,7 +90,7 @@ def month_calendar(context, events_pool=[], month=None, show_header=True, select
 
     links = {'prev': month+relativedelta(months=-1), 'next': month+relativedelta(months=+1)}
 
-    return {'month': month, 'month_calendar': month_calendar, 'today': today, 'links': links, 'show_header': show_header, "request":context['request']}
+    return {'month': month, 'month_calendar': month_calendar, 'today': today, 'links': links, 'show_header': show_header, "request":context['request'], "base_link": base_link, "get_args": get_args}
 
 register.inclusion_tag('eventtools/month_calendar.html', takes_context=True)(month_calendar)
 
