@@ -135,7 +135,9 @@ class EventViews(object):
                 'bounded': True,
                 'pageinfo': pageinfo,
                 'occurrence_pool': qs,
-                'occurrence_page': occurrence_pool,            
+                'occurrence_page': occurrence_pool,
+                'selected_start': date_bounds[0],        
+                'selected_end': date_bounds[1],        
             }
             
         else:         
@@ -161,6 +163,8 @@ class EventViews(object):
                 'pageinfo': pageinfo,
                 'occurrence_pool': occurrence_pool,
                 'occurrence_page': pageinfo.object_list,            
+                'selected_start': date_bounds[0],        
+                'selected_end': date_bounds[1],        
             }
     
     def occurrence_list(self, request): #probably want to override this for doing more filtering.
