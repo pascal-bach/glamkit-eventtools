@@ -205,9 +205,9 @@ class GeneratorModel(models.Model):
                         self.rule,
                     )
             else:
-                return _("\n ").join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
+                return u'\n '.join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
         else:
-            return pprint_datetime_span(self.event_start, self.event_end),
+            return pprint_datetime_span(self.event_start, self.event_end)
 
     
     def is_exception(self, dt):
