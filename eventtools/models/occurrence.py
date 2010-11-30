@@ -321,7 +321,7 @@ class OccurrenceQuerySetFN(object):
 
         if fr is None:
             if to is None:
-                return self.forthcoming(), (datetime.now(), to)
+                return self.forthcoming(), (date.today(), to)
             else:
                 return self.before(to).reverse(), (fr, to) #bleh, results unlikely to be authentic. First person to use this fix it up.
         else:
