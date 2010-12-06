@@ -1,29 +1,38 @@
-from django.contrib import admin
-from mptt.admin import MPTTModelAdmin
-from diff import generate_diff
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib import messages
+import datetime
+
+import django
+from django import forms
 from django.conf.urls.defaults import patterns, url
-from django.core.urlresolvers import reverse
+from django.contrib import admin, messages
 from django.core import validators
 from django.core.exceptions import ValidationError
-import datetime
-from django import forms
+from django.core.urlresolvers import reverse
 from django.db import models
-import django
-from eventtools import adminviews
+from django.http import QueryDict
+from django.shortcuts import get_object_or_404, redirect
+from mptt.forms import TreeNodeChoiceField
+from mptt.admin import MPTTModelAdmin
+
+from diff import generate_diff
 
 def create_children(modeladmin, request, queryset):
     for event in queryset:
         e = type(event)._event_manager.create(parent=event)
 create_children.short_description = "Create children of selected events"
 
+def EventForm(EventModel):
+    class _EventForm(forms.ModelForm):
+        parent = TreeNodeChoiceField(queryset=EventModel.objects.all(), level_indicator=u"-", required=False)
+
+        class Meta:
+            model = EventModel
+
+    return _EventForm
 
 def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use this admin.
     class _EventAdmin(MPTTModelAdmin):
+        form = EventForm(EventModel)
         list_display = ('__unicode__', 'occurrence_link')
-        actions = [create_children]
-        exclude = ['parent']
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
 
@@ -42,16 +51,6 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
         occurrence_link.short_description = 'Occurrences'
         occurrence_link.allow_tags = True
         
-        # list_display = ('title', 'edit_occurrences_link', 'all_occurrences_count', 'my_occurrences_count')
-
-        # def get_urls(self):
-        #     super_urls = super(EventAdminBase, self).get_urls()
-        #     my_urls = patterns('',
-        #         url(r'^(?P<id>\d+)/occurrences/$', self.admin_site.admin_view(adminviews.occurrences), {'modeladmin': self}),
-        #         # url(r'^(?P<event_id>\d+)/create_exception/(?P<gen_id>\d+)/(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})/(?P<hour>\d{1,2})-(?P<minute>\d{1,2})-(?P<second>\d{1,2})/$', self.admin_site.admin_view(make_exceptional_occurrence), {'modeladmin': self}),
-        #     )
-        #     return my_urls + super_urls
-
         def get_urls(self):
             return patterns(
                 '',
@@ -61,10 +60,26 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
 
         def create_child(self, request, parent_id):
             parent = get_object_or_404(EventModel, id=parent_id)
-            child = EventModel._default_manager.create(parent=parent)
-            return redirect("%s:%s_%s_change" % (
+            child = EventModel(parent=parent)
+
+            # We don't want to save child yet, as it is potentially incomplete.
+            # Instead, we'll get the parent and inheriting fields out of Event
+            # and put them into a GET string for the new_event from.
+            
+            GET = QueryDict("parent=%s" % parent.id).copy()
+            
+            for field_name in EventModel._event_meta.fields_to_inherit:
+                parent_attr = getattr(parent, field_name)
+                if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
+                    GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
+                else:
+                    GET[field_name] = parent_attr
+        
+            return redirect(
+                reverse("%s:%s_%s_add" % (
                     self.admin_site.name, EventModel._meta.app_label,
-                    EventModel._meta.module_name), child.id)
+                    EventModel._meta.module_name)
+                )+"?%s" % GET.urlencode())
         
         def change_view(self, request, object_id, extra_context={}):
             obj = EventModel._event_manager.get(pk=object_id)
