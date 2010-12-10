@@ -41,6 +41,7 @@ class GeneratorModel(models.Model):
     
     class Meta:
         abstract = True
+        ordering = ('event_start',)
 
     def __unicode__(self):
         return "%s, %s" % (self.event, self.robot_description())
