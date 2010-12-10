@@ -1,4 +1,5 @@
 # −*− coding: UTF−8 −*−
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.base import ModelBase
 from django.utils.translation import ugettext, ugettext_lazy as _
