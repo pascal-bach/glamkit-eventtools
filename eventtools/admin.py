@@ -73,6 +73,8 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
                 if parent_attr:
                     if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
                         GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
+                    elif hasattr(parent_attr, 'pk'): #for fk. Sufficient?
+                        GET[field_name] = parent_attr.pk
                     else:
                         GET[field_name] = parent_attr
         
