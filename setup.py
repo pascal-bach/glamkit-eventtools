@@ -20,7 +20,12 @@ setup(
                  'Operating System :: OS Independent',
                  'Programming Language :: Python',
                  'Topic :: Utilities'],
-    install_requires=['setuptools', 'vobject', 'python-dateutil'],
+    install_requires=['setuptools', 'vobject', 'python-dateutil', 'django-mptt'],
     license='BSD',
     test_suite = "eventtools.tests",
 )
+
+# also requires glamkit-convenient
+# pip install -e git+git://github.com/glamkit/glamkit-convenient.git#egg=convenient
+# JSONfield
+# pip install -e git+git://github.com/ixc/django-jsonfield.git#egg=jsonfield
