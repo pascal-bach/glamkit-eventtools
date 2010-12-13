@@ -162,9 +162,8 @@ class GeneratorModel(models.Model):
         """
         if not honour_exceptions or (honour_exceptions and not self.is_exception(start)):
             if self.occurrences.filter(start=start, end=end).count() == 0:
-                if self.Occurrence().objects.filter(event=self.event, start=start, end=end).count() == 0:
-                    occ = self.occurrences.create(event=self.event, start=start, end=end) #generator = self
-                    return occ
+                occ = self.occurrences.create(event=self.event, start=start, end=end) #generator = self
+                return occ
 
     def generate_dates(self):
         rule = self.rule.get_rrule(dtstart=self.event_start)
@@ -183,7 +182,7 @@ class GeneratorModel(models.Model):
         generate my occurrences
         """
 
-        if self.rule is None: #the only occurrence in the village
+        if self.rule is None: #the only occurrence in the village, boyo
             self.create_occurrence(start=self.event_start, end=self.event_end, honour_exceptions=True)
             return
 
