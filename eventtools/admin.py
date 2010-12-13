@@ -22,7 +22,7 @@ create_children.short_description = "Create children of selected events"
 
 def EventForm(EventModel):
     class _EventForm(forms.ModelForm):
-        parent = TreeNodeChoiceField(queryset=EventModel.objects.all(), level_indicator=u"-", required=False)
+        parent = TreeNodeChoiceField(queryset=EventModel._event_manager.all(), level_indicator=u"-", required=False)
 
         class Meta:
             model = EventModel
