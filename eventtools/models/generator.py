@@ -38,7 +38,7 @@ class GeneratorModel(models.Model):
     event_end = models.DateTimeField(blank=True, db_index=True)
     rule = models.ForeignKey(Rule, verbose_name=_(u"repetition rule"), null = True, blank = True, help_text=_(u"Select '----' for a one-off event."))
     repeat_until = models.DateTimeField(null = True, blank = True, help_text=_(u"These start dates are ignored for one-off events."))
-    exceptions = JSONField(null=True, blank=True, help_text=u_("These dates are skipped by the generator."), default={})
+    exceptions = JSONField(null=True, blank=True, help_text=_(u"These dates are skipped by the generator."), default={})
     
     class Meta:
         abstract = True
