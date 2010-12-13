@@ -70,10 +70,11 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
             
             for field_name in EventModel._event_meta.fields_to_inherit:
                 parent_attr = getattr(parent, field_name)
-                if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
-                    GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
-                else:
-                    GET[field_name] = parent_attr
+                if parent_attr:
+                    if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
+                        GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
+                    else:
+                        GET[field_name] = parent_attr
         
             return redirect(
                 reverse("%s:%s_%s_add" % (
