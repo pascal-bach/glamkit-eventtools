@@ -161,9 +161,19 @@ class GeneratorModel(models.Model):
             * the occurrence doesn't already exist for this event (regardless of the generator it came from)
         """
         if not honour_exceptions or (honour_exceptions and not self.is_exception(start)):
-            if self.occurrences.filter(start=start, end=end).count() == 0:
-                occ = self.occurrences.create(event=self.event, start=start, end=end) #generator = self
-                return occ
+            
+            if settings.ALLOW_CLASHING_OCCURRENCES:
+                # if this occurrence is already genecrated by this generator, do nothing
+                if self.occurrences.filter(start=start, end=end).count():
+                    return
+            else:                    
+                # if this occurrence exists at all, do nothing (it's a clash and they're not allowed)
+                if self.Occurrence().objects.filter(event=self.event, start=start, end=end).count():
+                    return
+            #good to go
+            return self.occurrences.create(event=self.event, start=start, end=end) #generator = self
+        # it's an exception, don't generate it.
+        return
 
     def generate_dates(self):
         rule = self.rule.get_rrule(dtstart=self.event_start)
