@@ -36,16 +36,16 @@ class GeneratorModel(models.Model):
     #define a field called 'event' in the subclass
     event_start = models.DateTimeField(db_index=True)
     event_end = models.DateTimeField(blank=True, db_index=True)
-    rule = models.ForeignKey(Rule, verbose_name=_("repetition rule"), null = True, blank = True, help_text=_("Select '----' for a one-off event."))
-    repeat_until = models.DateTimeField(null = True, blank = True, help_text=_("These start dates are ignored for one-off events."))
-    exceptions = JSONField(null=True, blank=True, help_text="These dates are skipped by the generator.", default={})
+    rule = models.ForeignKey(Rule, verbose_name=_(u"repetition rule"), null = True, blank = True, help_text=_(u"Select '----' for a one-off event."))
+    repeat_until = models.DateTimeField(null = True, blank = True, help_text=_(u"These start dates are ignored for one-off events."))
+    exceptions = JSONField(null=True, blank=True, help_text=u_("These dates are skipped by the generator."), default={})
     
     class Meta:
         abstract = True
         ordering = ('event_start',)
 
     def __unicode__(self):
-        return "%s, %s" % (self.event, self.robot_description())
+        return u"%s, %s" % (self.event, self.robot_description())
 
     def clean(self):
         if self.event_end is None:
@@ -196,13 +196,13 @@ class GeneratorModel(models.Model):
         if self.rule:
             if self.occurrences.count() > 3:
                 if self.repeat_until:
-                    return "%s, repeating %s until %s" % (
+                    return u"%s, repeating %s until %s" % (
                         pprint_datetime_span(self.event_start, self.event_end),
                         self.rule,
                         pprint_date_span(self.repeat_until, self.repeat_until)
                     )
                 else:
-                    return "%s, repeating %s" % (
+                    return u"%s, repeating %s" % (
                         pprint_datetime_span(self.event_start, self.event_end),
                         self.rule,
                     )
