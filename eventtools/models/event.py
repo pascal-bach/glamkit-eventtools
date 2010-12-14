@@ -208,6 +208,9 @@ class EventModelBase(MPTTModelBase):
          - overrides MPTT's TreeManager to the model
         """
         event_opts = class_dict.pop('EventMeta', None)
+        # Allow the manager to be overridden
+        manager_class = class_dict.pop('event_manager_class', EventTreeManager)
+        assert issubclass(manager_class, EventTreeManager), 'Custom managers must subclass EventTreeManager.'
         class_dict['_event_meta'] = EventOptions(event_opts)
         cls = super(EventModelBase, meta).__new__(meta, class_name, bases, class_dict)
                 
@@ -227,9 +230,9 @@ class EventModelBase(MPTTModelBase):
                     field.default = ModelInstanceAwareDefault(field_name, field.default)
                 except models.FieldDoesNotExist:
                     continue
-                
+            
             # Add a custom manager
-            manager = EventTreeManager(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
+            manager = manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
             setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
             
