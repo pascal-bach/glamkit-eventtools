@@ -22,7 +22,7 @@ create_children.short_description = "Create children of selected events"
 
 def EventForm(EventModel):
     class _EventForm(forms.ModelForm):
-        parent = TreeNodeChoiceField(queryset=EventModel.objects.all(), level_indicator=u"-", required=False)
+        parent = TreeNodeChoiceField(queryset=EventModel._event_manager.all(), level_indicator=u"-", required=False)
 
         class Meta:
             model = EventModel
@@ -70,10 +70,13 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
             
             for field_name in EventModel._event_meta.fields_to_inherit:
                 parent_attr = getattr(parent, field_name)
-                if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
-                    GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
-                else:
-                    GET[field_name] = parent_attr
+                if parent_attr:
+                    if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
+                        GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])
+                    elif hasattr(parent_attr, 'pk'): #for fk. Sufficient?
+                        GET[field_name] = parent_attr.pk
+                    else:
+                        GET[field_name] = parent_attr
         
             return redirect(
                 reverse("%s:%s_%s_add" % (
