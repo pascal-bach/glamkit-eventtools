@@ -315,9 +315,15 @@ class OccurrenceQuerySetFN(object):
         to = mapped_GET.get('enddate', None)
         
         if fr is not None:
-            fr = dateparser.parse(fr)
+            try:
+                fr = dateparser.parse(fr)
+            except ValueError:
+                fr = None
         if to is not None:
-            to = dateparser.parse(to)
+            try:
+                to = dateparser.parse(to)
+            except ValueError:
+                to = None
 
         if fr is None:
             if to is None:
