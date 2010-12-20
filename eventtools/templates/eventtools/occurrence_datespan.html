@@ -3,12 +3,12 @@
 
 {% block pagination %}
 	<span class="step-links">
-			<a href="?{% get_string 'startdate' pageinfo.previous_date_span.start 'enddate' pageinfo.previous_date_span.end %}">Earlier</a>
+			<a href="?{% get_string 'startdate' pageinfo.previous_date_span.start 'enddate' pageinfo.previous_date_span.end 'page' '' %}">Earlier</a>
 
 			<span class="current">
 					Showing {{ pageinfo.date_span }}.
 			</span>
 
-			<a href="?{% get_string 'startdate' pageinfo.next_date_span.start 'enddate' pageinfo.next_date_span.end %}">Later</a>
+			<a href="?{% get_string 'startdate' pageinfo.next_date_span.start 'enddate' pageinfo.next_date_span.end 'page' '' %}">Later</a>
 	</span>
 {% endblock %}

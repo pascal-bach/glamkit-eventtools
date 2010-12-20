@@ -208,6 +208,9 @@ class EventModelBase(MPTTModelBase):
          - overrides MPTT's TreeManager to the model
         """
         event_opts = class_dict.pop('EventMeta', None)
+        # Allow the manager to be overridden
+        manager_class = class_dict.pop('event_manager_class', EventTreeManager)
+        assert issubclass(manager_class, EventTreeManager), 'Custom managers must subclass EventTreeManager.'
         class_dict['_event_meta'] = EventOptions(event_opts)
         cls = super(EventModelBase, meta).__new__(meta, class_name, bases, class_dict)
                 
@@ -227,9 +230,9 @@ class EventModelBase(MPTTModelBase):
                     field.default = ModelInstanceAwareDefault(field_name, field.default)
                 except models.FieldDoesNotExist:
                     continue
-                
+            
             # Add a custom manager
-            manager = EventTreeManager(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
+            manager = manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
             setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
             
@@ -292,8 +295,11 @@ class EventModel(MPTTModel):
                         continue
                 child.save() #cascades to grandchildren
                 
-    def has_occurrences(self):
-        return self.occurrences.count()
+    def occurrence_count(self, include_descendants=True):
+        if include_descendants:
+            return self.get_descendants().occurrences().count()
+        else:
+            return self.occurrences.count()
         
     def opening_occurrence(self):
         try:
@@ -309,18 +315,15 @@ class EventModel(MPTTModel):
 
     def get_ancestors(self):
         ancestorqs = super(EventModel, self).get_ancestors()
-        # it's a django QuerySet, so we need to recast it as an EventQuerySet to call occurrences() on it.
         return ancestorqs
 
     def get_descendants(self, include_self=True):
         descendantsqs = super(EventModel, self).get_descendants(include_self=include_self)
-        # it's a django QuerySet, so we need to recast it as an EventQuerySet to call occurrences() on it.
         return descendantsqs
 
     def get_family(self, include_self=True):
         #have to call super, because the clone buggers up the filter...
         familyqs = super(EventModel, self).get_ancestors() | super(EventModel, self).get_descendants(include_self=include_self)
-        # it's a django QuerySet, so we need to recast it as an EventQuerySet to call occurrences() on it.
         return familyqs
         
     def highest_ancestor_having_occurrences(self, include_self=True, test=False):
@@ -329,7 +332,7 @@ class EventModel(MPTTModel):
             ancestors_with_occurrences = ancestors.having_occurrences()
             if ancestors_with_occurrences:
                 return ancestors_with_occurrences[0]
-        if include_self and self.has_occurrences():
+        if include_self and self.occurrence_count():
             return self
         return None
         
