@@ -131,6 +131,7 @@ class EventQuerySet(models.query.QuerySet):
 
 
 class EventTreeManager(TreeManager):
+    
     def get_query_set(self): 
         return EventQuerySet(self.model).order_by(
             self.tree_id_attr, self.left_attr)
@@ -190,6 +191,7 @@ class EventOptions(object):
     """
     
     fields_to_inherit = []
+    event_manager_class = EventTreeManager
     event_manager_attr = 'eventobjects'
     
     def __init__(self, opts):
@@ -229,7 +231,7 @@ class EventModelBase(MPTTModelBase):
                     continue
                 
             # Add a custom manager
-            manager = EventTreeManager(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
+            manager = cls._event_meta.event_manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
             setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
             
