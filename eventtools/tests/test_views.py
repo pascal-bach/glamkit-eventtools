@@ -1,14 +1,31 @@
 # -*- coding: utf-8“ -*-
-from django.test import TestCase
-from _inject_app import TestCaseWithApp as AppTestCase
-from eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
-from _fixture import bigfixture, reload_films
-from eventtools.utils import datetimeify
 from dateutil.relativedelta import relativedelta
+
+from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.test import TestCase
+
+from eventtools.utils import datetimeify
+from eventtools_testapp.models import *
+
+from _fixture import bigfixture, reload_films
+from _inject_app import TestCaseWithApp as AppTestCase
 
 class TestViews(AppTestCase):
+    
+    def setUp(self):
+        if hasattr(settings, 'OCCURRENCES_PER_PAGE'):
+            self._old_OCCURRENCES_PER_PAGE = settings.OCCURRENCES_PER_PAGE
+        settings.OCCURRENCES_PER_PAGE = 20
+        super(TestViews, self).setUp()
+    
+    def tearDown(self):
+        if hasattr(self, '_old_OCCURRENCES_PER_PAGE'):
+            settings.OCCURRENCES_PER_PAGE = self._old_OCCURRENCES_PER_PAGE
+        else:
+            delattr(settings, 'OCCURRENCES_PER_PAGE')
+        super(TestViews, self).tearDown()
     
     def test_purls(self):
         """

@@ -229,8 +229,9 @@ class EventModelBase(MPTTModelBase):
                     field.default = ModelInstanceAwareDefault(field_name, field.default)
                 except models.FieldDoesNotExist:
                     continue
-                
+            
             # Add a custom manager
+            assert issubclass(cls._event_meta.event_manager_class, EventTreeManager), 'Custom Event managers must subclass EventTreeManager.'
             manager = cls._event_meta.event_manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
             setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
