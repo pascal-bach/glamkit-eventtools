@@ -17,9 +17,15 @@ def datetimeify(d, t=None, clamp=MIN):
         return datetime.combine(d, time.max)
     return datetime.combine(d, time.min)
 
-def dayify(d): #returns two datetimes indicated the date given
+def dayify(d, d2=None): #returns two datetimes that encompass the day or days given
     if isinstance(d, datetime):
         d = d.date()
     start = datetimeify(d, clamp=MIN)
-    end = datetimeify(d, clamp=MAX)
+    
+    if d2 is not None:
+        if isinstance(d2, datetime):
+            d2 = d2.date()
+        end = datetimeify(d2, clamp=MAX)    
+    else:
+        end = datetimeify(d, clamp=MAX)
     return start, end

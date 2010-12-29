@@ -142,21 +142,6 @@ class EventViews(object):
             
         else:         
             pageinfo = self._paginate(request, occurrence_pool)
-            
-            # we're paging through all events in the pool, OCCURRENCES_PER_PAGE at a time.
-            paginator = Paginator(occurrence_pool, settings.OCCURRENCES_PER_PAGE)
-
-            # Make sure page request is an int. If not, deliver first page.
-            try:
-                page = int(request.GET.get('page', '1'))
-            except ValueError:
-                page = 1
-
-           # If page request (9999) is out of range, deliver last page of results.
-            try:
-                pageinfo = paginator.page(page)
-            except (EmptyPage, InvalidPage):
-                pageinfo = paginator.page(paginator.num_pages)
 
             return {
                 'bounded': False,

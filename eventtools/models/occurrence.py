@@ -8,13 +8,13 @@ from django.db.models.base import ModelBase
 from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
 from eventtools.utils import dateranges
+from eventtools.utils.viewutils import parse_GET_date
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 from django.utils.dateformat import format
 
 
 from datetime import date, time, datetime, timedelta
 
-from dateutil import parser as dateparser
 from dateutil.relativedelta import relativedelta
 
 from vobject.base import backslashEscape
@@ -40,7 +40,7 @@ class OccurrenceQuerySetFN(object):
         start = datetimeify(date, clamp="min")
         return self.filter(end__gte=start)
 
-    def starts_between(self, d1, d2, forthcoming_only=False, test=False):
+    def starts_between(self, d1, d2, forthcoming_only=False):
         """
         returns the occurrences that start in a given date/datetime range
         if forthcoming_only == True, and now is between start and end, then 
@@ -50,13 +50,15 @@ class OccurrenceQuerySetFN(object):
             now = datetime.now()
             if d1 <= now <= d2:
                 d1 = now
-        return self.starts_after(d1).starts_before(d2)     
+        return self.starts_after(d1).starts_before(d2)   
+          
     def ends_between(self, d1, d2, forthcoming_only=False):
         if forthcoming_only:
             now = datetime.now()
             if d1 <= now <= d2:
                 d1 = now
         return self.ends_after(d1).ends_before(d2)
+        
     def entirely_between(self, d1, d2, forthcoming_only=False):
         """
         returns the occurrences that both start and end in a given datetime range
@@ -307,34 +309,12 @@ class OccurrenceQuerySetFN(object):
         return self.model.Event()._event_manager.filter(id__in=event_ids)
         
     def from_GET(self, GET={}):
-        mapped_GET = {}
-        for k, v in GET.iteritems():
-            mapped_GET[settings.EVENT_GET_MAP.get(k, k)] = v
-        
-        fr = mapped_GET.get('startdate', None)
-        to = mapped_GET.get('enddate', None)
-        
-        if fr is not None:
-            try:
-                fr = dateparser.parse(fr)
-            except ValueError:
-                fr = None
-        if to is not None:
-            try:
-                to = dateparser.parse(to)
-            except ValueError:
-                to = None
+        fr, to = parse_GET_date(GET)
 
-        if fr is None:
-            if to is None:
-                return self.forthcoming(), (datetime.now(), to)
-            else:
-                return self.before(to).reverse(), (fr, to) #bleh, results unlikely to be authentic. First person to use this fix it up.
+        if to is None:
+            return self.after(fr), (fr, to)
         else:
-            if to is None:
-                return self.after(fr), (fr, to)
-            else:
-                return self.between(fr, to), (fr, to)
+            return self.between(fr, to), (fr, to)
                 
         
 class OccurrenceQuerySet(models.query.QuerySet, OccurrenceQuerySetFN):

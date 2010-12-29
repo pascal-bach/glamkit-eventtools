@@ -12,6 +12,7 @@ from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault
 from eventtools.utils.pprint_timespan import pprint_datetime_span
 
 class EventQuerySet(models.query.QuerySet):
+    #much as you may be tempted to add "storts_between" and other OccurrenceQuerySet methods, resist (for the sake of DRYness and performance). Instead, use OccurrenceQuerySet.starts_between().events().
     def occurrences(self, *args, **kwargs):
         return self.model.Occurrence().objects.filter(event__in=self).filter(*args, **kwargs)
     
