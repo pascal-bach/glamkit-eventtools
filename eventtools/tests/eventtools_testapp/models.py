@@ -14,7 +14,7 @@ class ExampleEvent(EventModel):
     
     def __unicode__(self):
         if self.difference_from_parent and self.parent:
-            return "%s (%s)" % (self.name, self.difference_from_parent)
+            return u"%s (%s)" % (self.name, self.difference_from_parent)
         return self.name
         
     class EventMeta:
