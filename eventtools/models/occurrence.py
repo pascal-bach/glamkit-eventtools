@@ -4,20 +4,21 @@ from django.utils.safestring import mark_safe
 from django.core.urlresolvers import reverse
 from django.db.models import signals
 from django.db.models.base import ModelBase
+from django.template.defaultfilters import urlencode
+from django.utils.dateformat import format
 
 from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
 from eventtools.utils import dateranges
 from eventtools.utils.viewutils import parse_GET_date
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
-from django.utils.dateformat import format
+from eventtools.utils.domain import django_root_url
 
 
 from datetime import date, time, datetime, timedelta
 
 from dateutil.relativedelta import relativedelta
 
-from vobject.base import backslashEscape
 from django.utils.translation import ugettext as _
 
 
@@ -424,7 +425,7 @@ class OccurrenceModel(models.Model):
             occ.generator.add_exception(occ.start)
        
     def __unicode__(self):
-        return "%s: %s" % (self.event, self.timespan_description())
+        return u"%s: %s" % (self.event, self.timespan_description())
         
     @classmethod
     def Event(cls):
@@ -458,6 +459,9 @@ class OccurrenceModel(models.Model):
         return self.timespan_description(html=True)
         
     def time_description(self, html=False):
+        if self.all_day:
+            return mark_safe(_("all day"))
+        
         t1 = self.start.time()
         if self.start.date() == self.end.date():
             t2 = self.end.time()
@@ -520,7 +524,6 @@ class OccurrenceModel(models.Model):
         else:
             return format(self.start, "m d")
         
-        
     def get_absolute_url(self):
         return reverse('occurrence', kwargs={'occurrence_id': self.id })
 
@@ -533,8 +536,6 @@ class OccurrenceModel(models.Model):
     
     def ical_summary(self):
         return unicode(self.event)
-        
-    
     
     def as_icalendar(self,
         ical,
@@ -577,11 +578,11 @@ class OccurrenceModel(models.Model):
                 
         summary = self._resolve_attr(summary_attr)
         if summary:
-            vevent.add('summary').value = backslashEscape(summary)
+            vevent.add('summary').value = summary
         
         description = self._resolve_attr(description_attr)
         if description:
-            vevent.add('description').value = backslashEscape(description)
+            vevent.add('description').value = description
         
         url = self._resolve_attr(url_attr)
         if url:
@@ -590,7 +591,7 @@ class OccurrenceModel(models.Model):
         
         location = self._resolve_attr(location_attr)
         if location:
-            vevent.add('location').value = backslashEscape(location)
+            vevent.add('location').value = location
             
         lat = self._resolve_attr(latitude_attr)
         lon = self._resolve_attr(longitude_attr)
@@ -598,3 +599,17 @@ class OccurrenceModel(models.Model):
             vevent.add('geo').value = "%s;%s" % (lon, lat)
             
         return ical 
+
+    def ics_url(self):
+        """
+        Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
+        an 'ics_for_occurrence' url, and properties for populating an ics for each event
+        (see OccurrenceModel.as_icalendar)
+        """
+        return django_root_url() + reverse("ics_for_occurrence", args=[self.pk])
+
+    def webcal_url(self):
+        return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
+        
+    def gcal_url(self):
+        return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())

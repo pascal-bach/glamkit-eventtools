@@ -4,12 +4,15 @@ from django.db.models.fields import FieldDoesNotExist
 from django.db.models import Count
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext, ugettext_lazy as _
+from django.template.defaultfilters import urlencode
 
 from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
-from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault
+from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
 from eventtools.utils.pprint_timespan import pprint_datetime_span
+from eventtools.utils.dateranges import DateTester
+from eventtools.utils.domain import django_root_url
 
 class EventQuerySet(models.query.QuerySet):
     #much as you may be tempted to add "storts_between" and other OccurrenceQuerySet methods, resist (for the sake of DRYness and performance). Instead, use OccurrenceQuerySet.starts_between().events().
@@ -342,3 +345,28 @@ class EventModel(MPTTModel):
         
     def robot_description(self):
         return u'\n '.join([gen.robot_description() for gen in self.generators.all()])
+
+    def has_finished(self):
+        for o in self.occurrences.all():
+            if not o.has_finished:
+                return False
+                
+        return True
+                
+    @property
+    def date_tester(self):
+        return DateTester(self.occurrences.all())
+
+    def ics_url(self):
+        """
+        Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
+        an 'ics_for_event' view and url, and properties for populating an ics for each event
+        (see OccurrenceModel.as_icalendar for default properties)
+        """
+        return django_root_url() + reverse("ics_for_event", args=[self.pk])
+
+    def webcal_url(self):
+        return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
+        
+    def gcal_url(self):
+        return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())

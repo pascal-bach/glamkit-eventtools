@@ -1,9 +1,12 @@
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
+from django.http import HttpResponse
 from eventtools.conf import settings
 from datetime import date
 from dateutil import parser as dateparser
+from vobject import iCalendar
 
-def _paginate(self, request, pool):
+
+def paginate(request, pool):
     paginator = Paginator(pool, settings.OCCURRENCES_PER_PAGE)
 
     # Make sure page request is an int. If not, deliver first page.
@@ -43,3 +46,21 @@ def parse_GET_date(GET={}):
         fr = date.today()
             
     return fr, to
+    
+def response_as_ical(request, occurrences):
+    ical = iCalendar()
+    ical.add('X-WR-CALNAME').value = settings.ICAL_CALNAME
+    ical.add('X-WR-CALDESC').value = settings.ICAL_CALDESC
+    ical.add('method').value = 'PUBLISH'  # IE/Outlook needs this
+
+    if hasattr(occurrences, '__iter__'):
+        for occ in occurrences:
+            ical = occ.as_icalendar(ical, request)
+    else:
+        ical = occurrences.as_icalendar(ical, request)
+    
+    icalstream = ical.serialize()
+    response = HttpResponse(icalstream, mimetype='text/calendar')
+    response['Filename'] = 'events.ics'  # IE needs this
+    response['Content-Disposition'] = 'attachment; filename=events.ics'
+    return response

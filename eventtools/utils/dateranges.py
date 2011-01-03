@@ -40,6 +40,23 @@ class XDateRange(object):
         else:
             before_end = True
         return after_start and before_end  
+
+class DateTester(object):
+    """
+    A class that takes a set of occurrences. Then you can test dates with it to see if the date is in that set.
+    
+    if date.today() in date_tester_object:
+        ...
+    
+    """
+    def __init__(self, occurrence_qs):
+        self.occurrence_qs = occurrence_qs
+        
+    def __contains__(self, d):
+        occs = self.occurrence_qs.starts_on(d)
+        return occs
+            
+
         
 def xdaterange(d1, d2):
     delta_range = range((d2-d1).days)
