@@ -15,7 +15,7 @@ from eventtools.models import EventModel
 
 register = template.Library()
 
-def calendar(context, date_classes):
+def make_calendar(context, date_classes):
     """
     Creates a configurable html calendar displaying one month.
     
@@ -87,6 +87,7 @@ def calendar(context, date_classes):
         'month_links': links,
     })
     
-    return context
+    return {}
 
-register.inclusion_tag('eventtools/calendar/calendar.html', takes_context=True)(calendar)
+#workarond for takes_context
+register.inclusion_tag('eventtools/_empty_.html', takes_context=True)(make_calendar)
