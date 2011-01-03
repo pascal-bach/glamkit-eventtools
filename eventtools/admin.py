@@ -126,7 +126,10 @@ class TreeModelChoiceField(forms.ModelChoiceField):
 
 
 class DateAndMaybeTimeField(forms.SplitDateTimeField):
-    """ Allow blank time; default to 00:00 / 23:59 (based on field label) """
+    """
+    Allow blank time; default to 00:00:00:00 / 11:59:59:99999 (based on field label) 
+    These times are time.min and time.max, by the way.
+    """
 
     widget = admin.widgets.AdminSplitDateTime
     
@@ -147,10 +150,11 @@ class DateAndMaybeTimeField(forms.SplitDateTimeField):
             if data_list[0] in validators.EMPTY_VALUES:
                 raise ValidationError(self.error_messages['invalid_date'])
             if data_list[1] in validators.EMPTY_VALUES:
+                import pdb; pdb.set_trace()
                 if self.label.lower().count('end'):
-                    data_list[1] = datetime.time(23,59)
+                    data_list[1] = datetime.time.max
                 else:
-                    data_list[1] = datetime.time()
+                    data_list[1] = datetime.time.min
             return datetime.datetime.combine(*data_list)
         return None
 
