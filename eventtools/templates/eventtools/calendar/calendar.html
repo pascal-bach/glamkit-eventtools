@@ -1,0 +1,17 @@
+<table class="calendar">
+<thead>
+	{% include 'eventtools/calendar/_month_header.html' %}
+</thead>
+<tbody>
+	{% for week in month_weeks %}
+		<tr> 
+			{% for day in week %}
+				{% include 'eventtools/calendar/_day.html' %}
+			{% endfor %}
+		</tr> 
+	{% endfor %}
+</tbody>
+<tfoot>
+	{% include 'eventtools/calendar/_month_nav.html' %}
+</tfoot>
+</table>

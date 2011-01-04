@@ -4,14 +4,18 @@ from django.db.models.fields import FieldDoesNotExist
 from django.db.models import Count
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext, ugettext_lazy as _
+from django.template.defaultfilters import urlencode
 
 from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
-from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault
+from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
 from eventtools.utils.pprint_timespan import pprint_datetime_span
+from eventtools.utils.dateranges import DateTester
+from eventtools.utils.domain import django_root_url
 
 class EventQuerySet(models.query.QuerySet):
+    #much as you may be tempted to add "storts_between" and other OccurrenceQuerySet methods, resist (for the sake of DRYness and performance). Instead, use OccurrenceQuerySet.starts_between().events().
     def occurrences(self, *args, **kwargs):
         return self.model.Occurrence().objects.filter(event__in=self).filter(*args, **kwargs)
     
@@ -131,6 +135,7 @@ class EventQuerySet(models.query.QuerySet):
 
 
 class EventTreeManager(TreeManager):
+    
     def get_query_set(self): 
         return EventQuerySet(self.model).order_by(
             self.tree_id_attr, self.left_attr)
@@ -190,6 +195,7 @@ class EventOptions(object):
     """
     
     fields_to_inherit = []
+    event_manager_class = EventTreeManager
     event_manager_attr = 'eventobjects'
     
     def __init__(self, opts):
@@ -208,9 +214,6 @@ class EventModelBase(MPTTModelBase):
          - overrides MPTT's TreeManager to the model
         """
         event_opts = class_dict.pop('EventMeta', None)
-        # Allow the manager to be overridden
-        manager_class = class_dict.pop('event_manager_class', EventTreeManager)
-        assert issubclass(manager_class, EventTreeManager), 'Custom managers must subclass EventTreeManager.'
         class_dict['_event_meta'] = EventOptions(event_opts)
         cls = super(EventModelBase, meta).__new__(meta, class_name, bases, class_dict)
                 
@@ -232,7 +235,8 @@ class EventModelBase(MPTTModelBase):
                     continue
             
             # Add a custom manager
-            manager = manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
+            assert issubclass(cls._event_meta.event_manager_class, EventTreeManager), 'Custom Event managers must subclass EventTreeManager.'
+            manager = cls._event_meta.event_manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
             setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
             
@@ -341,3 +345,28 @@ class EventModel(MPTTModel):
         
     def robot_description(self):
         return u'\n '.join([gen.robot_description() for gen in self.generators.all()])
+
+    def has_finished(self):
+        for o in self.occurrences.all():
+            if not o.has_finished:
+                return False
+                
+        return True
+                
+    @property
+    def date_tester(self):
+        return DateTester(self.occurrences.all())
+
+    def ics_url(self):
+        """
+        Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
+        an 'ics_for_event' view and url, and properties for populating an ics for each event
+        (see OccurrenceModel.as_icalendar for default properties)
+        """
+        return django_root_url() + reverse("ics_for_event", args=[self.pk])
+
+    def webcal_url(self):
+        return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
+        
+    def gcal_url(self):
+        return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())

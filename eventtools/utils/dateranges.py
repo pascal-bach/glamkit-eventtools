@@ -20,6 +20,44 @@ FIRST_DAY_OF_WEEK = _weekday_fn(settings.FIRST_DAY_OF_WEEK)
 FIRST_DAY_OF_WEEKEND = _weekday_fn(settings.FIRST_DAY_OF_WEEKEND)
 LAST_DAY_OF_WEEKEND = _weekday_fn(settings.LAST_DAY_OF_WEEKEND)
 
+class XDateRange(object):
+    """
+    Embryo class to replace xdaterange below, that allows d1 or d2 to be None.
+    
+    For now this is only used in calendar sets (which uses the 'in' method)
+    """
+    def __init__(self, d1, d2):
+        self.d1 = d1
+        self.d2 = d2
+        
+    def __contains__(self, d):
+        if self.d1 is not None:
+            after_start = d >= self.d1
+        else:
+            after_start = True
+        if self.d2 is not None:
+            before_end = d <= self.d2
+        else:
+            before_end = True
+        return after_start and before_end  
+
+class DateTester(object):
+    """
+    A class that takes a set of occurrences. Then you can test dates with it to see if the date is in that set.
+    
+    if date.today() in date_tester_object:
+        ...
+    
+    """
+    def __init__(self, occurrence_qs):
+        self.occurrence_qs = occurrence_qs
+        
+    def __contains__(self, d):
+        occs = self.occurrence_qs.starts_on(d)
+        return occs
+            
+
+        
 def xdaterange(d1, d2):
     delta_range = range((d2-d1).days)
     for td in delta_range:

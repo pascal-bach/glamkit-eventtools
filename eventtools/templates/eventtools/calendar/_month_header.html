@@ -1,0 +1,5 @@
+<tr class="days">
+	{% for day in month_weeks.0 %}
+	<th>{{ day.date|date:"l"|slice:":1" }}</th> 
+	{% endfor %}
+</tr> 

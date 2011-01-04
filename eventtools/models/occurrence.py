@@ -4,20 +4,21 @@ from django.utils.safestring import mark_safe
 from django.core.urlresolvers import reverse
 from django.db.models import signals
 from django.db.models.base import ModelBase
+from django.template.defaultfilters import urlencode
+from django.utils.dateformat import format
 
 from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
 from eventtools.utils import dateranges
+from eventtools.utils.viewutils import parse_GET_date
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
-from django.utils.dateformat import format
+from eventtools.utils.domain import django_root_url
 
 
 from datetime import date, time, datetime, timedelta
 
-from dateutil import parser as dateparser
 from dateutil.relativedelta import relativedelta
 
-from vobject.base import backslashEscape
 from django.utils.translation import ugettext as _
 
 
@@ -40,7 +41,7 @@ class OccurrenceQuerySetFN(object):
         start = datetimeify(date, clamp="min")
         return self.filter(end__gte=start)
 
-    def starts_between(self, d1, d2, forthcoming_only=False, test=False):
+    def starts_between(self, d1, d2, forthcoming_only=False):
         """
         returns the occurrences that start in a given date/datetime range
         if forthcoming_only == True, and now is between start and end, then 
@@ -50,13 +51,15 @@ class OccurrenceQuerySetFN(object):
             now = datetime.now()
             if d1 <= now <= d2:
                 d1 = now
-        return self.starts_after(d1).starts_before(d2)     
+        return self.starts_after(d1).starts_before(d2)   
+          
     def ends_between(self, d1, d2, forthcoming_only=False):
         if forthcoming_only:
             now = datetime.now()
             if d1 <= now <= d2:
                 d1 = now
         return self.ends_after(d1).ends_before(d2)
+        
     def entirely_between(self, d1, d2, forthcoming_only=False):
         """
         returns the occurrences that both start and end in a given datetime range
@@ -307,34 +310,12 @@ class OccurrenceQuerySetFN(object):
         return self.model.Event()._event_manager.filter(id__in=event_ids)
         
     def from_GET(self, GET={}):
-        mapped_GET = {}
-        for k, v in GET.iteritems():
-            mapped_GET[settings.EVENT_GET_MAP.get(k, k)] = v
-        
-        fr = mapped_GET.get('startdate', None)
-        to = mapped_GET.get('enddate', None)
-        
-        if fr is not None:
-            try:
-                fr = dateparser.parse(fr)
-            except ValueError:
-                fr = None
-        if to is not None:
-            try:
-                to = dateparser.parse(to)
-            except ValueError:
-                to = None
+        fr, to = parse_GET_date(GET)
 
-        if fr is None:
-            if to is None:
-                return self.forthcoming(), (datetime.now(), to)
-            else:
-                return self.before(to).reverse(), (fr, to) #bleh, results unlikely to be authentic. First person to use this fix it up.
+        if to is None:
+            return self.after(fr), (fr, to)
         else:
-            if to is None:
-                return self.after(fr), (fr, to)
-            else:
-                return self.between(fr, to), (fr, to)
+            return self.between(fr, to), (fr, to)
                 
         
 class OccurrenceQuerySet(models.query.QuerySet, OccurrenceQuerySetFN):
@@ -444,7 +425,7 @@ class OccurrenceModel(models.Model):
             occ.generator.add_exception(occ.start)
        
     def __unicode__(self):
-        return "%s: %s" % (self.event, self.timespan_description())
+        return u"%s: %s" % (self.event, self.timespan_description())
         
     @classmethod
     def Event(cls):
@@ -478,6 +459,9 @@ class OccurrenceModel(models.Model):
         return self.timespan_description(html=True)
         
     def time_description(self, html=False):
+        if self.all_day:
+            return mark_safe(_("all day"))
+        
         t1 = self.start.time()
         if self.start.date() == self.end.date():
             t2 = self.end.time()
@@ -540,7 +524,6 @@ class OccurrenceModel(models.Model):
         else:
             return format(self.start, "m d")
         
-        
     def get_absolute_url(self):
         return reverse('occurrence', kwargs={'occurrence_id': self.id })
 
@@ -553,8 +536,6 @@ class OccurrenceModel(models.Model):
     
     def ical_summary(self):
         return unicode(self.event)
-        
-    
     
     def as_icalendar(self,
         ical,
@@ -597,11 +578,11 @@ class OccurrenceModel(models.Model):
                 
         summary = self._resolve_attr(summary_attr)
         if summary:
-            vevent.add('summary').value = backslashEscape(summary)
+            vevent.add('summary').value = summary
         
         description = self._resolve_attr(description_attr)
         if description:
-            vevent.add('description').value = backslashEscape(description)
+            vevent.add('description').value = description
         
         url = self._resolve_attr(url_attr)
         if url:
@@ -610,7 +591,7 @@ class OccurrenceModel(models.Model):
         
         location = self._resolve_attr(location_attr)
         if location:
-            vevent.add('location').value = backslashEscape(location)
+            vevent.add('location').value = location
             
         lat = self._resolve_attr(latitude_attr)
         lon = self._resolve_attr(longitude_attr)
@@ -618,3 +599,17 @@ class OccurrenceModel(models.Model):
             vevent.add('geo').value = "%s;%s" % (lon, lat)
             
         return ical 
+
+    def ics_url(self):
+        """
+        Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
+        an 'ics_for_occurrence' url, and properties for populating an ics for each event
+        (see OccurrenceModel.as_icalendar)
+        """
+        return django_root_url() + reverse("ics_for_occurrence", args=[self.pk])
+
+    def webcal_url(self):
+        return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
+        
+    def gcal_url(self):
+        return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())

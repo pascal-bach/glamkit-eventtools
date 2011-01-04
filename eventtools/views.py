@@ -3,12 +3,10 @@ from django.template.context import RequestContext
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
 from django.utils.safestring import mark_safe
 from django.conf.urls.defaults import *
-from django.http import HttpResponse
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import humanized_date_range
 from dateutil.relativedelta import relativedelta
-from vobject import iCalendar
-
+from eventtools.viewutils import paginate, response_as_ical
 
 class EventViews(object):
     #define
@@ -28,28 +26,7 @@ class EventViews(object):
             url(r'^(?P<occurrence_id>\d+)/events\.ics$', \
                 self.occurrence_ical, name='occurrence_ical'),
         )
-    
-    def response_as_ical(self, request, occurrences):
-        ical = iCalendar()
-        ical.add('X-WR-CALNAME').value = settings.ICAL_CALNAME
-        ical.add('X-WR-CALDESC').value = settings.ICAL_CALDESC
-        ical.add('method').value = 'PUBLISH'  # IE/Outlook needs this
-    
-        if hasattr(occurrences, '__iter__'):
-            for occ in occurrences:
-                ical = occ.as_icalendar(ical, request)
-        else:
-            ical = occurrences.as_icalendar(ical, request)
-        
-        icalstream = ical.serialize()
-        response = HttpResponse(icalstream, mimetype='text/calendar')
-        response['Filename'] = 'events.ics'  # IE needs this
-        response['Content-Disposition'] = 'attachment; filename=events.ics'
-
-        return response
-    
-
-
+            
     #occurrence
     def _occurrence_context(self, request, occurrence_id):
         return {
@@ -62,7 +39,7 @@ class EventViews(object):
 
     def occurrence_ical(self, request, occurrence_id):
         context = self._occurrence_context(request, occurrence_id)
-        return self.response_as_ical(request, [context['occurrence']])
+        return response_as_ical(request, [context['occurrence']])
         
     #event
     def _event_context(self, request, event_slug):
@@ -75,27 +52,10 @@ class EventViews(object):
             'event_children': event_descendants,
             'occurrence_pool': occurrence_pool,
         }
-
-    def _paginate(self, request, pool):
-        paginator = Paginator(pool, settings.OCCURRENCES_PER_PAGE)
-
-        # Make sure page request is an int. If not, deliver first page.
-        try:
-            page = int(request.GET.get('page', '1'))
-        except ValueError:
-            page = 1
-
-       # If page request (9999) is out of range, deliver last page of results.
-        try:
-            pageinfo = paginator.page(page)
-        except (EmptyPage, InvalidPage):
-            pageinfo = paginator.page(paginator.num_pages)
-
-        return pageinfo
     
     def event(self, request, event_slug):
         event_context = self._event_context(request, event_slug)
-        pageinfo = self._paginate(request, event_context['occurrence_pool'])
+        pageinfo = paginate(request, event_context['occurrence_pool'])
         
         event_context.update({
             'occurrence_page': pageinfo.object_list,
@@ -106,7 +66,7 @@ class EventViews(object):
  
     def event_ical(self, request, event_slug):
         event_context = self._event_context(request, event_slug)
-        return self.response_as_ical(request, event_context['occurrence_pool'])
+        return response_as_ical(request, event_context['occurrence_pool'])
 
     #occurrence_list
     def _occurrence_list_context(self, request, qs):
@@ -141,22 +101,7 @@ class EventViews(object):
             }
             
         else:         
-            pageinfo = self._paginate(request, occurrence_pool)
-            
-            # we're paging through all events in the pool, OCCURRENCES_PER_PAGE at a time.
-            paginator = Paginator(occurrence_pool, settings.OCCURRENCES_PER_PAGE)
-
-            # Make sure page request is an int. If not, deliver first page.
-            try:
-                page = int(request.GET.get('page', '1'))
-            except ValueError:
-                page = 1
-
-           # If page request (9999) is out of range, deliver last page of results.
-            try:
-                pageinfo = paginator.page(page)
-            except (EmptyPage, InvalidPage):
-                pageinfo = paginator.page(paginator.num_pages)
+            pageinfo = paginate(request, occurrence_pool)
 
             return {
                 'bounded': False,
@@ -180,4 +125,4 @@ class EventViews(object):
     def occurrence_list_ical(self, request):
         occurrence_list_context = self._occurrence_list_context(request, self.occurrence_qs)
         pool = occurrence_list_context['occurrence_pool']
-        return self.response_as_ical(request, pool)
+        return response_as_ical(request, pool)
