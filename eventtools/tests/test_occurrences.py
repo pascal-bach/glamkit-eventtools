@@ -128,7 +128,7 @@ class TestOccurrences(AppTestCase):
 
         self.assertTrue(o.time_to_go() < timedelta(0))
         self.ae(o2.time_to_go(), None)
-        self.assertTrue(o.relative_time_to_go().months < 0)
+        self.assertTrue(o.relative_time_to_go().years < 0)
         self.ae(o2.relative_time_to_go(), None)
 
 """
