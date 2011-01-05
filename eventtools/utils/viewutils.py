@@ -42,7 +42,7 @@ def parse_GET_date(GET={}):
         except ValueError:
             to = None
 
-    if fr is None:
+    if fr is None and to is None:
         fr = date.today()
             
     return fr, to

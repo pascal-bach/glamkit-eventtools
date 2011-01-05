@@ -1,3 +1,6 @@
+from datetime import date, time, datetime, timedelta
+from dateutil.relativedelta import relativedelta
+
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
@@ -6,6 +9,7 @@ from django.db.models import signals
 from django.db.models.base import ModelBase
 from django.template.defaultfilters import urlencode
 from django.utils.dateformat import format
+from django.utils.translation import ugettext as _
 
 from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
@@ -13,13 +17,6 @@ from eventtools.utils import dateranges
 from eventtools.utils.viewutils import parse_GET_date
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 from eventtools.utils.domain import django_root_url
-
-
-from datetime import date, time, datetime, timedelta
-
-from dateutil.relativedelta import relativedelta
-
-from django.utils.translation import ugettext as _
 
 
 class OccurrenceQuerySetFN(object):
@@ -314,8 +311,9 @@ class OccurrenceQuerySetFN(object):
 
         if to is None:
             return self.after(fr), (fr, to)
-        else:
-            return self.between(fr, to), (fr, to)
+        if fr is None:
+            return self.before(to).reverse(), (fr, to)
+        return self.between(fr, to), (fr, to)
                 
         
 class OccurrenceQuerySet(models.query.QuerySet, OccurrenceQuerySetFN):
