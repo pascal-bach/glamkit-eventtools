@@ -1,4 +1,9 @@
-import calendar
+import sys, imp
+
+pycal = sys.modules.get('calendar')
+if not pycal:
+    pycal = imp.load_module('calendar',*imp.find_module('calendar'))
+
 from datetime import date, timedelta
 from dateutil.relativedelta import *
 from django import template
@@ -26,7 +31,7 @@ def month_calendar(context, events_pool=[], month=None, show_header=True, select
     if week_start is None:
         week_start = eventtools_settings.FIRST_DAY_OF_WEEK
 
-    cal = calendar.Calendar(week_start)
+    cal = pycal.Calendar(week_start)
     today = date.today()
     if not month:
         month = date.today()
