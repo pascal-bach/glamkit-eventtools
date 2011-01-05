@@ -1,12 +1,14 @@
+from dateutil.relativedelta import relativedelta
+
+from django.conf.urls.defaults import *
+from django.core.paginator import Paginator, EmptyPage, InvalidPage
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template.context import RequestContext
-from django.core.paginator import Paginator, EmptyPage, InvalidPage
 from django.utils.safestring import mark_safe
-from django.conf.urls.defaults import *
+
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import humanized_date_range
-from dateutil.relativedelta import relativedelta
-from eventtools.viewutils import paginate, response_as_ical
+from eventtools.utils.viewutils import paginate, response_as_ical
 
 class EventViews(object):
     #define
@@ -81,12 +83,12 @@ class EventViews(object):
             pageinfo = {
                 'date_span': mark_safe(humanized_date_range(*date_bounds, imply_year=False, space="&nbsp;", range_str="&ndash;")),
                 'previous_date_span': {
-                    'start': earlier[0].date().isoformat(),
-                    'end': earlier[1].date().isoformat(),
+                    'start': earlier[0].isoformat(),
+                    'end': earlier[1].isoformat(),
                 },
                 'next_date_span': {
-                    'start': later[0].date().isoformat(),
-                    'end': later[1].date().isoformat(),
+                    'start': later[0].isoformat(),
+                    'end': later[1].isoformat(),
                 },
                 'date_delta': date_delta.days
             }
