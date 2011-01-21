@@ -131,7 +131,7 @@ class GeneratorModel(models.Model):
                         occurrence_set = self.occurrences.filter(start__in=list(self.generate_dates()))
                     elif self.event_end.time() != saved_self.event_end.time(): #we're only shifting times
                         occurrence_set = [o for o in self.occurrences.all() if o.end.time() == saved_self.event_end.time()]
-
+                    
                     for occ in occurrence_set:
                         occ.end += end_shift
                         occ.save()
@@ -176,6 +176,10 @@ class GeneratorModel(models.Model):
         return
 
     def generate_dates(self):
+        if self.rule is None:
+            yield self.event_start
+            raise StopIteration
+        
         rule = self.rule.get_rrule(dtstart=self.event_start)
         date_iter = iter(rule)
         drop_dead_date = self.repeat_until or datetime.now() + settings.DEFAULT_GENERATOR_LIMIT
