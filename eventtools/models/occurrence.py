@@ -1,7 +1,9 @@
 from datetime import date, time, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+from dateutil.tz import gettz
 
 from django.db import models
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.safestring import mark_safe
 from django.core.urlresolvers import reverse
@@ -561,13 +563,24 @@ class OccurrenceModel(models.Model):
         
         """
         vevent = ical.add('vevent')
-
-        if self.all_day:            
-            vevent.add('dtstart').value = self.start.date()
-            vevent.add('dtend').value = self.end.date()
+        
+        # Add the timezone specified in the project settings to the event start
+        # and end datetimes, if they don't have a timezone already
+        if not self.start.tzinfo and not self.end.tzinfo \
+                and getattr(settings, 'TIME_ZONE', None):
+            tz = gettz(settings.TIME_ZONE)
+            start = self.start.replace(tzinfo=tz)
+            end = self.start.replace(tzinfo=tz)
         else:
-            vevent.add('dtstart').value = self.start
-            vevent.add('dtend').value = self.end
+            start = self.start
+            end = self.end
+        
+        if self.all_day:            
+            vevent.add('dtstart').value = start.date()
+            vevent.add('dtend').value = end.date()
+        else:
+            vevent.add('dtstart').value = start
+            vevent.add('dtend').value = end
         
         cancelled = self._resolve_attr(cancelled_attr)
         if cancelled:
