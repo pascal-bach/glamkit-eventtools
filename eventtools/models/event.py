@@ -1,3 +1,5 @@
+from operator import itemgetter
+
 from django.db import models
 from django.db.models.base import ModelBase
 from django.db.models.fields import FieldDoesNotExist
@@ -344,7 +346,15 @@ class EventModel(MPTTModel):
         return reverse('event', kwargs={'event_slug': self.slug })
         
     def robot_description(self):
-        return u'\n '.join([gen.robot_description() for gen in self.generators.all()])
+        spans = reduce(list.__add__, [gen.get_spans() for gen in self.generators.all()])
+        spans.sort(key=itemgetter(0))
+        repeated_spans = u'\n'.join([pprint_datetime_span(start, end) + repeat_description \
+            for start, end, repeat_description in spans if repeat_description])
+        ordinary_spans = u'\n'.join([pprint_datetime_span(start, end) \
+            for start, end, repeat_description in spans if not repeat_description])
+        if repeated_spans and ordinary_spans:
+            repeated_spans += '\n\n'
+        return repeated_spans + ordinary_spans
 
     def has_finished(self):
         for o in self.occurrences.all():

@@ -206,24 +206,26 @@ class GeneratorModel(models.Model):
             self.create_occurrence(start=o_start, end=o_end, honour_exceptions=True)
 
     def robot_description(self):
+        return u'\n'.join(
+            [pprint_datetime_span(start, end) + repeat_description \
+            for start, end, repeat_description in self.get_spans()])
+    
+    def get_spans(self):
         if self.rule:
             if self.occurrences.count() > 3:
                 if self.repeat_until:
-                    return u"%s, repeating %s until %s" % (
-                        pprint_datetime_span(self.event_start, self.event_end),
+                    repeat_description = u', repeating %s until %s' % (
                         self.rule,
                         pprint_date_span(self.repeat_until, self.repeat_until)
                     )
                 else:
-                    return u"%s, repeating %s" % (
-                        pprint_datetime_span(self.event_start, self.event_end),
-                        self.rule,
-                    )
+                    repeat_description = u', repeating %s' % self.rule
+                return [(self.event_start, self.event_end, repeat_description),]
             else:
-                return u'\n '.join([pprint_datetime_span(occ.start.date(), occ.start.time()) for occ in self.occurrences.all()])
+                return [(occ.start, occ.end, u'') for occ in self.occurrences.all()]
         else:
-            return pprint_datetime_span(self.event_start, self.event_end)
-
+            return [(self.event_start, self.event_end, u''),]
+        
     
     def is_exception(self, dt):
         if self.exceptions is None:
