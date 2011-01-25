@@ -1,6 +1,7 @@
 from datetime import date, time, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from dateutil.tz import gettz
+from vobject.icalendar import utc
 
 from django.db import models
 from django.conf import settings
@@ -564,21 +565,24 @@ class OccurrenceModel(models.Model):
         """
         vevent = ical.add('vevent')
         
-        # Add the timezone specified in the project settings to the event start
-        # and end datetimes, if they don't have a timezone already
-        if not self.start.tzinfo and not self.end.tzinfo \
-                and getattr(settings, 'TIME_ZONE', None):
-            tz = gettz(settings.TIME_ZONE)
-            start = self.start.replace(tzinfo=tz)
-            end = self.start.replace(tzinfo=tz)
-        else:
-            start = self.start
-            end = self.end
+        start = self.start
+        end = self.end
         
         if self.all_day:            
             vevent.add('dtstart').value = start.date()
             vevent.add('dtend').value = end.date()
         else:
+            # Add the timezone specified in the project settings to the event start
+            # and end datetimes, if they don't have a timezone already
+            if not start.tzinfo and not end.tzinfo \
+                    and getattr(settings, 'TIME_ZONE', None):
+                tz = gettz(settings.TIME_ZONE)
+                start = start.replace(tzinfo=tz)
+                end = end.replace(tzinfo=tz)
+                # Since Google Calendar (and probably others) can't handle timezone
+                # declarations inside ICS files, convert to UTC before adding.
+                start = start.astimezone(utc)
+                end = end.astimezone(utc)
             vevent.add('dtstart').value = start
             vevent.add('dtend').value = end
         
