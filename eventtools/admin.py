@@ -150,7 +150,6 @@ class DateAndMaybeTimeField(forms.SplitDateTimeField):
             if data_list[0] in validators.EMPTY_VALUES:
                 raise ValidationError(self.error_messages['invalid_date'])
             if data_list[1] in validators.EMPTY_VALUES:
-                import pdb; pdb.set_trace()
                 if self.label.lower().count('end'):
                     data_list[1] = datetime.time.max
                 else:
