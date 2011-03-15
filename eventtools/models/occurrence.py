@@ -470,7 +470,7 @@ class OccurrenceModel(models.Model):
             t2 = t1
         
         if html:
-            return mark_safe(pprint_time_span(t1, t2, range_str="&ndash;"))
+            return mark_safe(pprint_time_span(t1, t2, range_str="&ndash;&#8203;"))
         return pprint_time_span(t1, t2)
         
     def html_time_description(self):
