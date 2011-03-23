@@ -52,11 +52,15 @@ class GeneratorModel(models.Model):
             self.event_end = self.event_start
         
         if self.event_start > self.event_end:
-            raise ValidationError('start must be earlier than end')
+            raise ValidationError('Start must be earlier than end.')
         if self.repeat_until is not None and self.repeat_until < self.event_end:
-            raise ValidationError('repeat_until must not be earlier than start')
+            raise ValidationError('Repeat_until must not be earlier than start.')
         if self.repeat_until is not None and self.rule is None:
-            raise ValidationError('repeat_until has no effect without a repetition rule')
+            raise ValidationError('Repeat_until has no effect without a repetition rule.')
+        # This data entry mistake is common enough to justify a slight hack
+        if self.rule and self.rule.frequency == 'DAILY' \
+                and self.event_end - self.event_start > timedelta(1):
+            raise ValidationError('Daily events cannot span multiple days; the event start and end dates should be the same.')
         super(GeneratorModel, self).clean()
 
     
@@ -76,14 +80,18 @@ class GeneratorModel(models.Model):
             self.event_end.time == time.max
 
         if self.event_start > self.event_end:
-            raise AttributeError('start must be earlier than end')
+            raise AttributeError('Start must be earlier than end.')
 
         if self.repeat_until is not None and self.repeat_until < self.event_start:
-            raise AttributeError('repeat_until must not be earlier than start')
+            raise AttributeError('Repeat_until must not be earlier than start.')
         
         if self.repeat_until is not None and self.rule is None:
-            raise AttributeError('repeat_until has no effect without a repetition rule')
-
+            raise AttributeError('Repeat_until has no effect without a repetition rule.')
+        
+        if self.rule and self.rule.frequency == 'DAILY' \
+                and self.event_end - self.event_start > timedelta(1):
+            raise AttributeError('Daily events cannot span multiple days; the event start and end dates should be the same.')
+        
         """
         When you change a generator and save it, it updates its existing occurrences according to the following:
         
