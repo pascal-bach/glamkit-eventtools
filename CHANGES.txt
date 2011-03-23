@@ -15,7 +15,12 @@ while to execute):
 from datetime import timedelta
 from events.models import Generator # Or wherever your subclass of GeneratorModel lives
 for generator in [g for g in Generator.objects.filter(rule__frequency='DAILY') if g.event_end - g.event_start > timedelta(1)]:
+	if not generator.repeat_until:
+		generator.repeat_until = generator.event_end
 	generator.event_end = generator.event_end.replace(*generator.event_start.timetuple()[:3])
 	generator.save()
+
+# Review the occurrences to be deleted with caution before executing this
+len([o.delete() for o in Occurrence.objects.filter(generator__rule__frequency='DAILY') if o.start.date() != o.end.date()])
 
 -------------------------------------------------------------------------------
