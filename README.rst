@@ -17,6 +17,6 @@ Features:
  * flexible calendar template tags
  * project sample which can be launched immediately and reused in your project
 
-Please read the `documentation <http://docs.glamkit.org/eventtools/>`_.
+Please read the `documentation <http://docs.glamkit.org/documentation/eventtools/>`_.
 
 Dependencies: python-vobject, dateutils
