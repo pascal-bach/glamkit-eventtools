@@ -29,8 +29,8 @@ def EventForm(EventModel):
 
     return _EventForm
 
-def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use this admin.
-    class _EventAdmin(MPTTModelAdmin):
+def EventAdmin(EventModel, SuperModel=MPTTModelAdmin): #pass in the name of your EventModel subclass to use this admin.
+    class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
         list_display = ('__unicode__', 'occurrence_link')
         change_form_template = 'admin/eventtools/event.html'
@@ -41,12 +41,14 @@ def EventAdmin(EventModel): #pass in the name of your EventModel subclass to use
             self.occurrence_model = self.model.occurrences.related.model
         
         def occurrence_link(self, event):
-            return '<a href="%s">View Occurrences</a>' % (
+            return '<a href="%s">View %s Occurrences</a>' % (
                 reverse("%s:%s_%s_changelist_for_event" % (
                         self.admin_site.name,
                         self.occurrence_model._meta.app_label,
                         self.occurrence_model._meta.module_name),
-                        args=(event.id,)))
+                        args=(event.id,)),
+                event.occurrence_count(),
+                )
                 
         occurrence_link.short_description = 'Occurrences'
         occurrence_link.allow_tags = True
