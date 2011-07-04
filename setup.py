@@ -20,7 +20,7 @@ setup(
                  'Operating System :: OS Independent',
                  'Programming Language :: Python',
                  'Topic :: Utilities'],
-    install_requires=['setuptools', 'vobject', 'python-dateutil'],
+    install_requires=['setuptools', 'vobject', 'python-dateutil==1.5'],
     license='BSD',
     test_suite = "eventtools.tests",
 )
