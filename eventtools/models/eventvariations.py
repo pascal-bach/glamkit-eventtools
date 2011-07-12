@@ -64,4 +64,4 @@ class EventVariationBase(models.Model):
         
     class Meta:
         abstract = True
-        ordering = ['unvaried_event__title', 'reason']
+        ordering = ['unvaried_event', 'reason']
