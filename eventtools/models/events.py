@@ -291,7 +291,7 @@ class EventBase(models.Model):
         """
         returns the number of variations that this event has
         """
-        if self.__class__.varied_by:
+        if getattr(self.__class__,'varied_by',None):
             try:
                 return self.variations.count()
             except: # if none have been created, there is no such thing as self.variations, so return 0

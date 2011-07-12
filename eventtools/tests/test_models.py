@@ -514,3 +514,24 @@ class TestModel(TestCase):
             rule=None,
             result=0
         )
+
+
+    def test_clean_with_variation(self):
+        """ a model with variations defined can be cleaned """
+
+        evt = BroadcastEvent.objects.create(presenter = "Jimmy McBigmouth", studio=2)
+
+        #have we got the FKs in place
+        self.assertTrue(hasattr(BroadcastEventVariation, 'unvaried_event'))
+        self.assertTrue(hasattr(evt, 'variations'))
+        # let's try it out
+        var_event = evt.create_variation(presenter = "Amy Sub")
+        evt.full_clean()
+
+    def test_clean_with_no_varied_event_defined(self):
+        """ a model with no variations defined can be cleaned """
+
+        subject = 'Effective Time Management for Django Programmers'
+        lesson = LessonEvent.objects.create(subject=subject)
+        self.assertFalse(hasattr(lesson,'variations'))
+        lesson.full_clean()
