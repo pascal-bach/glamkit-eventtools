@@ -87,7 +87,7 @@ class TestViews(AppTestCase):
         self.assertNotContains(r, "Saturday, 2 January 2010") #there are no events
         self.assertContains(r, "Sunday, 3 January 2010", 1) #only print the date once
 
-        self.assertContains(r, "10am&ndash;noon")
+        self.assertContains(r, "10am&ndash;&#8203;noon")
         self.assertNotContains(r, "12am")# these are all-day
         self.assertNotContains(r, "00:00")# these are all-day
         self.assertNotContains(r, "midnight") # these are all-day
