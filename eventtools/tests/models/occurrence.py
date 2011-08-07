@@ -1,9 +1,9 @@
 # -*- coding: utf-8“ -*-
 from django.test import TestCase
-from _inject_app import TestCaseWithApp as AppTestCase
-from eventtools_testapp.models import *
+from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
+from eventtools.tests.eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
-from _fixture import bigfixture, reload_films
+from eventtools.tests._fixture import bigfixture, reload_films
 from eventtools.utils import datetimeify
 from dateutil.relativedelta import relativedelta
 

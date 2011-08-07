@@ -1,8 +1,8 @@
 from django.test import TestCase
-from _inject_app import TestCaseWithApp as AppTestCase
-from eventtools_testapp.models import *
+from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
+from eventtools.tests.eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
-from _fixture import bigfixture, reload_films
+from eventtools.tests._fixture import bigfixture, reload_films
 from eventtools.utils import dateranges
 
 class TestTestEvents(AppTestCase):
@@ -10,7 +10,8 @@ class TestTestEvents(AppTestCase):
     def test_creation(self):
 
         """
-        When you create an TestEventModel, you need to create an ExampleOccurrence class with a field 'event' that FKs to event.
+        When you create an TestEventModel,
+        you need to create an ExampleOccurrence class with a field 'event' that FKs to event.
         
         TestOccurrences are sorted by start (then end) by default.
 
