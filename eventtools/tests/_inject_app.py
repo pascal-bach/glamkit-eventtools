@@ -1,3 +1,7 @@
+import shlex
+import subprocess
+from random import randint
+
 from django.db.models.loading import load_app
 from django.conf import settings
 from django.core.management import call_command
@@ -43,3 +47,10 @@ class TestCaseWithApp(TestCase):
     def _refresh_cache(self):
         reload(app_directories)
         loader.template_source_loaders = None
+
+    def open_string_in_browser(self, s):
+        filename = "/tmp/%s.html" % randint(1, 100)
+        f = open(filename, "w")
+        f.write(s)
+        f.close()
+        subprocess.call(shlex.split("google-chrome %s" % filename))
