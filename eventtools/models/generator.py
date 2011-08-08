@@ -2,6 +2,7 @@
 from django.db import models, transaction
 from django.db.models.base import ModelBase
 from django.utils.translation import ugettext, ugettext_lazy as _
+from django.core import exceptions
 
 from dateutil import rrule
 
@@ -11,7 +12,8 @@ from nosj.fields import JSONField
 
 from eventtools.utils import datetimeify
 from eventtools.conf import settings
-from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
+from eventtools.utils.pprint_timespan import (
+    pprint_datetime_span, pprint_date_span)
 
 from datetime import date, time, datetime, timedelta
 
@@ -48,16 +50,19 @@ class GeneratorModel(models.Model):
     def clean(self):
         if self.event_end is None:
             self.event_end = self.event_start
-        
+
         if self.event_start > self.event_end:
-            raise ValidationError('start must be earlier than end')
-        if self.repeat_until is not None and self.repeat_until < self.event_end:
-            raise ValidationError('repeat_until must not be earlier than start')
+            raise exceptions.ValidationError('start must be earlier than end')
+        if self.repeat_until is not None and \
+                self.repeat_until < self.event_end:
+            raise exceptions.ValidationError(
+                'repeat_until must not be earlier than start')
         if self.repeat_until is not None and self.rule is None:
-            raise ValidationError('repeat_until has no effect without a repetition rule')
+            raise exceptions.ValidationError(
+                'repeat_until has no effect without a repetition rule')
         super(GeneratorModel, self).clean()
 
-    
+
     @transaction.commit_on_success()
     def save(self, *args, **kwargs):
         generate = kwargs.pop('generate', True)
