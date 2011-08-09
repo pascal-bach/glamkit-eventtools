@@ -26,10 +26,11 @@ def EventForm(EventModel):
 
         class Meta:
             model = EventModel
-
     return _EventForm
 
-def EventAdmin(EventModel, SuperModel=MPTTModelAdmin): #pass in the name of your EventModel subclass to use this admin.
+def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
+    """ pass in the name of your EventModel subclass to use this admin. """
+    
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
         list_display = ('__unicode__', 'occurrence_link')
@@ -66,7 +67,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin): #pass in the name of your
 
             # We don't want to save child yet, as it is potentially incomplete.
             # Instead, we'll get the parent and inheriting fields out of Event
-            # and put them into a GET string for the new_event from.
+            # and put them into a GET string for the new_event form.
             
             GET = QueryDict("parent=%s" % parent.id).copy()
             

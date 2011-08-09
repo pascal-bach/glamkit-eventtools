@@ -217,7 +217,8 @@ class EventModelBase(MPTTModelBase):
         """
         event_opts = class_dict.pop('EventMeta', None)
         class_dict['_event_meta'] = EventOptions(event_opts)
-        cls = super(EventModelBase, meta).__new__(meta, class_name, bases, class_dict)
+        cls = super(EventModelBase, meta) \
+            .__new__(meta, class_name, bases, class_dict)
                 
         try:
             EventModel
@@ -232,17 +233,28 @@ class EventModelBase(MPTTModelBase):
                 try:
                     field = cls._meta.get_field(field_name)
                     #injecting our fancy inheriting default
-                    field.default = ModelInstanceAwareDefault(field_name, field.default)
+                    field.default = ModelInstanceAwareDefault(
+                        field_name,
+                        field.default
+                    )
                 except models.FieldDoesNotExist:
                     continue
             
             # Add a custom manager
-            assert issubclass(cls._event_meta.event_manager_class, EventTreeManager), 'Custom Event managers must subclass EventTreeManager.'
-            manager = cls._event_meta.event_manager_class(cls._mptt_meta) #since EventTreeManager subclasses TreeManager, it also needs the mptt options
-            manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
-            setattr(cls, '_event_manager', getattr(cls, cls._event_meta.event_manager_attr))
+            assert issubclass(
+                cls._event_meta.event_manager_class, EventTreeManager
+            ), 'Custom Event managers must subclass EventTreeManager.'
             
-            #override the treemanager with self too, so we don't need to recast all querysets
+            # since EventTreeManager subclasses TreeManager, it also needs the
+            # mptt options
+            manager = cls._event_meta.event_manager_class(cls._mptt_meta)
+            manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
+            setattr(cls, '_event_manager',
+                getattr(cls, cls._event_meta.event_manager_attr)
+            )
+            
+            # override the treemanager with self too,
+            # so we don't need to recast all querysets
             manager.contribute_to_class(cls, cls._mptt_meta.tree_manager_attr)
             setattr(cls, '_tree_manager', getattr(cls, cls._mptt_meta.tree_manager_attr))
 
@@ -256,9 +268,10 @@ class EventModel(MPTTModel):
     class Meta:
         abstract = True
     
+    def __unicode__(self):
+        return u"Event with %s occurrences" % self.occurrence_count()
+
     def update_endless_generators(self):
-    
-        
         if hasattr(self, 'generators'):
             endless_generators = self.generators.filter(rule__isnull=False, repeat_until__isnull=True)
             [g.generate() for g in endless_generators]

@@ -29,7 +29,7 @@ background:#BBFFBB none repeat scroll 0 0;
   {% if original and object.id %}
     <p>
        <a href="create_child/">[ Create child event ]</a>
-       <a href="{{ occurrences_url }}">[ View occurrences ]</a>
+       <a href="{{ occurrences_url }}">[ View {{ object.occurrence_count }} occurrences ]</a>
     </p>
   {% endif %}
 
