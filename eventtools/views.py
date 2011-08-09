@@ -11,11 +11,23 @@ from eventtools.utils.pprint_timespan import humanized_date_range
 from eventtools.utils.viewutils import paginate, response_as_ical
 
 class EventViews(object):
-    #define
-    #event_qs
-    #occurrence_qs
-    
-    def get_urls(self):
+    """
+    define in subclasses:
+    event_qs
+    occurrence_qs
+    """
+
+    def __init__(self, event_qs, occurrence_qs=None):
+        self.event_qs = event_qs
+        
+        if occurrence_qs is None:
+            occurrence_qs = event_qs.occurrences()
+        self.occurrence_qs = occurrence_qs
+
+    @property
+    def urls(self):
+        from django.conf.urls.defaults import patterns, url
+
         return patterns('',
             url(r'^$', self.occurrence_list, name='occurrence_list'),
             url(r'^event/(?P<event_slug>[-\w]+)/$', self.event, name='event'),
