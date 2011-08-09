@@ -4,10 +4,10 @@ from setuptools import setup, find_packages
  
 setup(
     name='glamkit-eventtools',
-    version='2.0.0a1',
+    version='1.0.0a1',
     description='An event management app for Django.',
-    author='Thomas Ashelford',
-    author_email='thomas@interaction.net.au',
+    author='Greg Turner',
+    author_email='greg@interaction.net.au',
     url='http://github.com/glamkit/glamkit-eventtools',
     packages=find_packages(),
     include_package_data=True,
@@ -20,12 +20,10 @@ setup(
                  'Operating System :: OS Independent',
                  'Programming Language :: Python',
                  'Topic :: Utilities'],
-    install_requires=['setuptools', 'vobject', 'python-dateutil', 'django-mptt'],
+    install_requires=['setuptools', 'vobject==0.8.1c', 'python-dateutil==1.5', 'django-mptt'],
     license='BSD',
     test_suite = "eventtools.tests",
 )
 
-# also requires glamkit-convenient
-# pip install -e git+git://github.com/glamkit/glamkit-convenient.git#egg=convenient
-# JSONfield
-# pip install -e git+git://github.com/ixc/django-jsonfield.git#egg=jsonfield
+# also requires libraries in REQUIREMENTS.txt
+# pip install -r REQUIREMENTS.txt
