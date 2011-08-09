@@ -382,7 +382,7 @@ class OccurrenceGeneratorBase(models.Model):
             next = generator.next()
             yield occ_replacer.get_occurrence(next)
             
-    def save(self):
+    def save(self,*args,**kwargs):
         # if the occurrence generator changes, we must not break the link with persisted occurrences
         if self.id: # must already exist
             saved_self = self.__class__.objects.get(pk=self.id)
@@ -411,5 +411,5 @@ class OccurrenceGeneratorBase(models.Model):
                     occ.unvaried_end_time = unvaried_end.time()
 
                     occ.save()
-        super(OccurrenceGeneratorBase, self).save()
+        super(OccurrenceGeneratorBase, self).save(*args,**kwargs)
 
