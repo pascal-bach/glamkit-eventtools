@@ -19,7 +19,7 @@ from eventtools.utils.domain import django_root_url
 class EventQuerySet(models.query.QuerySet):
     #much as you may be tempted to add "storts_between" and other OccurrenceQuerySet methods, resist (for the sake of DRYness and performance). Instead, use OccurrenceQuerySet.starts_between().events().
     def occurrences(self, *args, **kwargs):
-        return self.model.Occurrence().objects.filter(event__in=self).filter(*args, **kwargs)
+        return self.model.OccurrenceModel().objects.filter(event__in=self).filter(*args, **kwargs)
     
     def opening_occurrences(self):
         pks = []
@@ -269,7 +269,12 @@ class EventModel(MPTTModel):
         abstract = True
     
     def __unicode__(self):
-        return u"Event with %s occurrences" % self.occurrence_count()
+        c = self.occurrence_count()
+        r = u"Event with %s occurrence" % c
+        if c != 1:
+            r += "s"
+        return r
+        
 
     def update_endless_generators(self):
         if hasattr(self, 'generators'):
@@ -282,14 +287,12 @@ class EventModel(MPTTModel):
         return super(EventModel, self).save(*args, **kwargs)
                 
     @classmethod
-    def Occurrence(cls):
+    def OccurrenceModel(cls):
         return cls.occurrences.related.model
 
     @classmethod
-    def Generator(cls):
-        if hasattr(cls, 'generators'):
-            return cls.generators.related.model
-
+    def GeneratorModel(cls):
+        return cls.generators.related.model
         
     def reload(self):
         """

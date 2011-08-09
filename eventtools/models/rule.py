@@ -56,7 +56,7 @@ class Rule(models.Model):
         >>> rule.get_params()
         {'count': 1, 'byminute': [1, 2, 4, 5], 'bysecond': 1}
         """
-    	params = self.params
+        params = self.params
         if params is None:
             return {}
         params = params.split(';')
@@ -73,7 +73,7 @@ class Rule(models.Model):
     def __unicode__(self):
         """Human readable string for Rule"""
         return self.name or unicode(self.frequency).lower()
-
+    
     def get_rrule(self, dtstart):
         if self.complex_rule:
             try:

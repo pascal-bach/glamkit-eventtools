@@ -1,7 +1,7 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 {% load mptt_tags %}
-{% block extrahead %}
+{% block extrastyle %}
 {{ block.super }}
 <style type="text/css">
 ins, del {
@@ -29,7 +29,6 @@ background:#BBFFBB none repeat scroll 0 0;
   {% if original and object.id %}
     <p>
        <a href="create_child/">[ Create child event ]</a>
-       <a href="{{ occurrences_url }}">[ View {{ object.occurrence_count }} occurrences ]</a>
     </p>
   {% endif %}
 
