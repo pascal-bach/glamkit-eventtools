@@ -13,14 +13,9 @@ from django.shortcuts import get_object_or_404, redirect
 from mptt.forms import TreeNodeChoiceField
 from mptt.admin import MPTTModelAdmin
 
-from diff import generate_diff
+from utils.diff import generate_diff
 
 from models import Rule
-
-def create_children(modeladmin, request, queryset):
-    for event in queryset:
-        e = type(event)._event_manager.create(parent=event)
-create_children.short_description = "Create children of selected events"
 
 def EventForm(EventModel):
     class _EventForm(forms.ModelForm):
