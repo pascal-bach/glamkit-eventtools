@@ -1,10 +1,12 @@
-Primary Authors of django-schedule:
+glamkit-eventtools Authors:
+
+    * Thomas Ashelford <thomas@interaction.net.au>
+    * Greg Turner <greg@interaction.net.au>
+
+Authors and Contributors of django-schedule:
  
     * Tony Hauber
     * Bartek Gorny
-
-Contributors:
-
     * Alex Gaynor
     * Rock Howard
     * Alik Kurdyukow
@@ -15,7 +17,3 @@ Contributors:
     * ptoal
     * Wes Winham
 
-glamkit-eventtools Authors:
-
-    * Thomas Ashelford <thomas@interaction.net.au>
-    * Greg Turner <greg@interaction.net.au>

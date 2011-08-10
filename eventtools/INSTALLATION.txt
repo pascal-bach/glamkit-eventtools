@@ -2,9 +2,6 @@
 
     pip install -e REQUIREMENTS.txt
 
-Define settings.SITE_NAME = "My site name" and settings.SITE_URL = "http://mysite.com"
-(These will be used in eventtools to publish pURLs).
-
 1. List the required applications in the ``INSTALLED_APPS`` portion of your settings
    file.  Your settings file might look something like::
    
@@ -23,24 +20,40 @@ Define settings.SITE_NAME = "My site name" and settings.SITE_URL = "http://mysit
            'pagination.middleware.PaginationMiddleware',
        )
 
-3. Define models. In your new app:
+3. Define models in your new app. We suggest calling the Event model 'Event'
+to better use the built-in templates:
 
-    * Define a model that subclasses models.EventModel.
-    
-    * In EventMeta, define the fields that you want to be automatically inherited by children (children_inherit)
+    from django.db import models
+    from eventtools.models import EventModel, OccurrenceModel, GeneratorModel #, ExclusionModel
 
-    * You can also rename the manager, by default called `eventobjects`.
+    class Event(EventModel):
+        teaser = models.TextField(blank=True)
+        image = models.ImageField(upload_to="events_uploads", blank=True)
+        #etc
 
-    * Define a model that subclasses models.OccurrenceModel. Give it a FK to the 1st model called 'event' that has a related name 'occurrences'
-    
+    class Generator(GeneratorModel):
+        event = models.ForeignKey(Event, related_name="generators")
+
+    class Occurrence(OccurrenceModel):
+        event = models.ForeignKey(Event, related_name="occurrences")
+        generated_by = models.ForeignKey(Generator, blank=True, null=True, related_name="occurrences")
 
 4. Set up admin:
-        Event registered with EventAdmin
 
-Feincms option
---------------
-Install feincms (add to INSTALLED_APPS)
+    from django.contrib import admin
+    from eventtools.admin import EventAdmin
+    from .models import Event
 
-Event registered with FeinCMSEventAdmin
+    admin.site.register(Event, EventAdmin(Event))
+    
+5. Set up view URLs:
 
-...
+    from django.conf.urls.defaults import *
+    from eventtools.views import EventViews
+    from .models import Event
+
+    views = EventViews(event_qs=Event.eventobjects.all())
+
+    urlpatterns = patterns('',
+        url(r'^', include(views.urls)),
+    )
