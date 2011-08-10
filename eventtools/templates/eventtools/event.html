@@ -1,0 +1,36 @@
+{% extends "_base.html" %}
+
+{% block title %}{{ event.title }} :: {{ block.super }}{% endblock %}
+
+{% block content %}
+
+	<h1>{{ event.title }}</h1>
+	{% if perms.events.can_change_event %}<a href="{% url admin:events_event_change event.pk %}">edit</a>{% endif %}
+
+	<p class="season">When: {{ event.sessions|linebreaksbr }}<p>
+	
+	
+	{% with event.get_descendants as descendants %}
+		{% if descendants %}
+		<h2>{{ event.title }} includes</h2>
+		<ul class="children" />
+			{% for event in descendants %}
+			 <li>{% include "eventtools/_event_in_list.html" %}</li>
+			{% endfor %}
+		</ul>
+		{% endif %}
+	{% endwith %}
+
+
+	{% with event.complete_occurrences.all as occurrences %}
+		{% if occurrences %}
+		<h2>Sessions</h2>
+			<ul class="occurrences" />
+				{% for o in occurrences %}
+				<li>{{ o.html_timespan }}{% if o.event != event %}: <a href="{{ o.event.get_absolute_url }}">{{ o.event }}</a>{% endif %}</li>
+				{% endfor %}
+			</ul>
+		{% endif %}
+	{% endwith %}
+
+{% endblock %}
