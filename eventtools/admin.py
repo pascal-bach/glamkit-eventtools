@@ -32,6 +32,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
         form = EventForm(EventModel)
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
+        prepopulated_fields = {'slug': ('title', )}
         inlines = [
             OccurrenceInline(EventModel.OccurrenceModel()),
             GeneratorInline(EventModel.GeneratorModel()),
@@ -44,10 +45,10 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
             return patterns(
                 '',
                 url(r'(?P<parent_id>\d+)/create_child/',
-                    self.admin_site.admin_view(self.create_child))
+                    self.admin_site.admin_view(self._create_child))
                 ) + super(_EventAdmin, self).get_urls()
         
-        def create_child(self, request, parent_id):
+        def _create_child(self, request, parent_id):
             parent = get_object_or_404(EventModel, id=parent_id)
             child = EventModel(parent=parent)
         
@@ -100,14 +101,6 @@ else:
         return _FeinCMSEventAdmin
 
 
-class TreeModelChoiceField(forms.ModelChoiceField):
-    """ ModelChoiceField which displays depth of objects within MPTT tree. """
-    def label_from_instance(self, obj):
-        super_label = \
-            super(TreeModelChoiceField, self).label_from_instance(obj)
-        return u"%s%s" % ("-"*obj.level, super_label)
-
-
 class DateAndMaybeTimeField(forms.SplitDateTimeField):
     """
     Allow blank time; default to 00:00:00:00 / 11:59:59:99999 (based on field label) 
@@ -154,7 +147,7 @@ def OccurrenceInline(OccurrenceModel):
 def GeneratorInline(GeneratorModel):
     class _GeneratorInline(admin.TabularInline):
         model = GeneratorModel
-        extra = 1
+        extra = 0
         formfield_overrides = {
             models.DateTimeField: {'form_class': DateAndMaybeTimeField},
         }        
