@@ -12,7 +12,7 @@ from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
-from eventtools.utils.pprint_timespan import pprint_datetime_span
+from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
 from eventtools.utils.dateranges import DateTester
 from eventtools.utils.domain import django_root_url
 
@@ -264,17 +264,22 @@ class EventModel(MPTTModel):
     __metaclass__ = EventModelBase
     
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
+    title = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    season_description = models.CharField(_("season"), blank=True, null=True, 
+        max_length=200, help_text="a summary description of when this event \
+        is on (one will be generated from the occurrences if not provided)"
+    )
+    sessions_description = models.TextField(_("sessions"), blank=True,
+        null=True, help_text="a more detailed description of when sessions are\
+        (e.g. \'Tuesdays and Thursdays throughout Feburary, at 10:30am\')"
+    )
 
     class Meta:
         abstract = True
     
     def __unicode__(self):
-        c = self.occurrence_count()
-        r = u"Event with %s occurrence" % c
-        if c != 1:
-            r += "s"
-        return r
-        
+        return self.title
 
     def update_endless_generators(self):
         if hasattr(self, 'generators'):
@@ -316,32 +321,21 @@ class EventModel(MPTTModel):
                     except AttributeError:
                         continue
                 child.save() #cascades to grandchildren
-                
-    def occurrence_count(self, include_descendants=True):
-        if include_descendants:
-            return self.get_descendants().occurrences().count()
-        else:
-            return self.occurrences.count()
-        
+                        
     def opening_occurrence(self):
         try:
-            return self.occurrences.all()[0]
+            return self.complete_occurrences().all()[0]
         except IndexError:
             return None
         
     def closing_occurrence(self):
         try:
-            return self.occurrences.all().reverse()[0]
+            return self.complete_occurrences().all().reverse()[0]
         except IndexError:
             return None
 
-    def get_ancestors(self):
-        ancestorqs = super(EventModel, self).get_ancestors()
-        return ancestorqs
-
-    def get_descendants(self, include_self=True):
-        descendantsqs = super(EventModel, self).get_descendants(include_self=include_self)
-        return descendantsqs
+    def complete_occurrences(self):
+        return self.get_descendants(include_self=True).occurrences()
 
     def get_family(self, include_self=True):
         #have to call super, because the clone buggers up the filter...
@@ -354,30 +348,16 @@ class EventModel(MPTTModel):
             ancestors_with_occurrences = ancestors.having_occurrences()
             if ancestors_with_occurrences:
                 return ancestors_with_occurrences[0]
-        if include_self and self.occurrence_count():
+        if include_self and self.complete_occurrences().count():
             return self
         return None
         
     def get_absolute_url(self):
-        return reverse('event', kwargs={'event_slug': self.slug })
+        return reverse('events:event', kwargs={'event_slug': self.slug })
         
-    def robot_description(self):
-        spans = reduce(list.__add__, [gen.get_spans() for gen in self.generators.all()])
-        spans.sort(key=itemgetter(0))
-        repeated_spans = u'\n'.join([pprint_datetime_span(start, end) + repeat_description \
-            for start, end, repeat_description in spans if repeat_description])
-        ordinary_spans = u'\n'.join([pprint_datetime_span(start, end) \
-            for start, end, repeat_description in spans if not repeat_description])
-        if repeated_spans and ordinary_spans:
-            repeated_spans += '\n\n'
-        return repeated_spans + ordinary_spans
-
     def has_finished(self):
-        for o in self.occurrences.all():
-            if not o.has_finished:
-                return False
-                
-        return True
+        """ the event has finished if the closing occurrence has finished. """
+        return self.closing_occurrence().has_finished
                 
     @property
     def date_tester(self):
@@ -396,3 +376,30 @@ class EventModel(MPTTModel):
         
     def gcal_url(self):
         return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())
+        
+    def season(self):
+        """
+        Returns a string describing the first and last dates of this event.
+        """
+        if self.season_description:
+            return self.season_description
+        
+        first = self.opening_occurrence().start.date()
+        last = self.closing_occurrence().start.date()
+        
+        return pprint_date_span(first, last)
+
+    def robot_description(self):
+        #TODO: this is horrid and doesn't seem to show non-generated occurrences
+        spans = reduce(list.__add__, [gen.get_spans() for gen in self.generators.all()])
+        spans.sort(key=itemgetter(0))
+        repeated_spans = u'\n'.join([pprint_datetime_span(start, end) + repeat_description \
+            for start, end, repeat_description in spans if repeat_description])
+        ordinary_spans = u'\n'.join([pprint_datetime_span(start, end) \
+            for start, end, repeat_description in spans if not repeat_description])
+        if repeated_spans and ordinary_spans:
+            repeated_spans += '\n\n'
+        return repeated_spans + ordinary_spans
+
+    def sessions(self):
+        return self.sessions_description or self.robot_description()
