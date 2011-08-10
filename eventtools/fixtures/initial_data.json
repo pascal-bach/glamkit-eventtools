@@ -1,0 +1,57 @@
+[
+  {
+    "pk": 1, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "", 
+      "frequency": "DAILY", 
+      "params": "", 
+      "name": "Daily", 
+      "common": false
+    }
+  }, 
+  {
+    "pk": 5, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "RRULE:FREQ=WEEKLY;INTERVAL=2", 
+      "frequency": "", 
+      "params": "", 
+      "name": "Fortnightly", 
+      "common": false
+    }
+  }, 
+  {
+    "pk": 2, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "", 
+      "frequency": "WEEKLY", 
+      "params": "byweekday:0,1,2,3,4", 
+      "name": "Weekdays", 
+      "common": false
+    }
+  }, 
+  {
+    "pk": 3, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "", 
+      "frequency": "WEEKLY", 
+      "params": "byweekday:5,6", 
+      "name": "Weekends", 
+      "common": false
+    }
+  }, 
+  {
+    "pk": 4, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "", 
+      "frequency": "WEEKLY", 
+      "params": "", 
+      "name": "Weekly", 
+      "common": false
+    }
+  }
+]
