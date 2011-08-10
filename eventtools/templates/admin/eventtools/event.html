@@ -21,6 +21,23 @@ ins {
 -moz-background-origin:padding;
 background:#BBFFBB none repeat scroll 0 0;
 }
+
+/* hard to apply to just tbody! */
+#occurrences-group fieldset.module {
+	max-height: 500px;
+	overflow: auto;
+	position: relative;
+}
+
+/* hide inlines text */
+#occurrences-group td.original p {
+	display: none;
+}
+
+#occurrences-group tr.has_original td {
+	padding-top: 0;
+}
+
 </style>
 {% endblock %}
 

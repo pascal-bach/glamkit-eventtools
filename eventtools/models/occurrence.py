@@ -526,7 +526,7 @@ class OccurrenceModel(models.Model):
             return format(self.start, "m d")
         
     def get_absolute_url(self):
-        return reverse('occurrence', kwargs={'occurrence_id': self.id })
+        return self.event.get_absolute_url()
 
     def _resolve_attr(self, attr):
         v = getattr(self, attr, None)
