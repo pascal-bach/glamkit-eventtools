@@ -14,5 +14,11 @@
 	<body> 
 		{% block content %}
 		{% endblock %}
+		{% block scripts %}
+			{# calendar scrolling. For projects already include jQuery, use http://cdn.jquerytools.org/1.2.5/tiny/jquery.tools.min.js #}
+			<script src="http://cdn.jquerytools.org/1.2.5/jquery.tools.min.js"></script>
+			{# shows session times when you click #}
+			<script src="{{ STATIC_URL }}eventtools/js/events.js"></script>
+		{% endblock scripts %}
 	</body> 
 </html>

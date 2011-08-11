@@ -1,4 +1,4 @@
-{% extends "_base.html" %}
+{% extends "eventtools/_base.html" %}
 {% load calendar %}
 
 {% block extrahead %}
@@ -16,7 +16,7 @@
 
 	{% regroup occurrence_page by start_date as day_list %}
 	
-	{% nav_calendar selected_start occurrence_page %}{# shows a global nav calendar where dates in occurrence_page are highligted #}
+	{% nav_calendar selected_start occurrence_qs %}{# shows a global nav calendar where dates in occurrence_page are highligted #}
 	
 	<ul class="days">
 		{% for day in day_list %}

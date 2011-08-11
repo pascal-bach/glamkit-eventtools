@@ -1,4 +1,4 @@
-{% extends "_base.html" %}
+{% extends "eventtools/_base.html" %}
 {% load calendar %}
 
 {% block title %}{{ event.title }} :: {{ block.super }}{% endblock %}
@@ -8,15 +8,13 @@
 	<h1>{{ event.title }}</h1>
 	{% if perms.events.can_change_event %}<a href="{% url admin:events_event_change event.pk %}">edit</a>{% endif %}
 
-	{% nav_calendar event.complete_occurrences.0 event.complete_occurrences %}
-
 	<p class="season">When: {{ event.sessions|linebreaksbr }}<p>
 	
 	
 	{% with event.get_descendants as descendants %}
 		{% if descendants %}
 		<h2>{{ event.title }} includes</h2>
-		<ul class="children" />
+		<ul class="children">
 			{% for event in descendants %}
 			 <li>{% include "eventtools/_event_in_list.html" %}</li>
 			{% endfor %}
@@ -25,14 +23,24 @@
 	{% endwith %}
 
 
+
+	{% display_calendars event.complete_occurrences %}
+
 	{% with event.complete_occurrences.all as occurrences %}
 		{% if occurrences %}
-		<h2>Sessions</h2>
-			<ul class="occurrences" />
-				{% for o in occurrences %}
-				<li>{{ o.html_timespan }}{% if o.event != event %}: <a href="{{ o.event.get_absolute_url }}">{{ o.event }}</a>{% endif %}</li>
+		<div id="sessions">
+			{% regroup occurrences by start_date as day_list %}
+
+			<h2>Sessions</h2>
+			<dl class="sessions">
+				{% for day in day_list %}
+					<dt data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ day.grouper|date:"l, j F Y" }}</dt>
+					{% for o in day.list %}
+						<dd data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ o.html_time_description }}{% if o.event != event %}: <a href="{{ o.event.get_absolute_url }}">{{ o.event }}</a>{% endif %}</dd>
+					{% endfor %}
 				{% endfor %}
-			</ul>
+			</dl>
+		</div>
 		{% endif %}
 	{% endwith %}
 
