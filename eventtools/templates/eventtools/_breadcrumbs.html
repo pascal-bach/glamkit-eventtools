@@ -1,0 +1,4 @@
+<a href="{% url events:index %}">Events</a>&nbsp;&rsaquo;&nbsp;
+{% for parent in event.get_ancestors %}
+	<a href="{{ parent.get_absolute_url }}">{{ parent.title }}</a>&nbsp;&rsaquo;&nbsp;
+{% endfor %}
