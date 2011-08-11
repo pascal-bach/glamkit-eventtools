@@ -30,6 +30,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
     
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
+        list_display = ('title', 'complete_occurrences_count', 'season')
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}

@@ -277,6 +277,7 @@ class EventModel(MPTTModel):
 
     class Meta:
         abstract = True
+        ordering = ['tree_id', 'lft'] 
     
     def __unicode__(self):
         return self.title
@@ -337,6 +338,10 @@ class EventModel(MPTTModel):
     def complete_occurrences(self):
         return self.get_descendants(include_self=True).occurrences()
 
+    def complete_occurrences_count(self):
+        """needed by admin"""
+        return self.complete_occurrences().count()
+        
     def get_family(self, include_self=True):
         #have to call super, because the clone buggers up the filter...
         familyqs = super(EventModel, self).get_ancestors() | super(EventModel, self).get_descendants(include_self=include_self)
