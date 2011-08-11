@@ -129,18 +129,34 @@ def calendar(
     
     return context
 
-def nav_calendar(context, occurrences_or_date=None):
+def nav_calendar(context, date=None, occurrence_qs=[]):
+    """
+    Renders a nav calendar for a date, and an optional occurrence_qs.
+    Dates in the occurrence_qs are given the class 'highlight'.
+    """
+    
     def date_href_fn(day):
-        #TODO: make url reverse!
-        return "/events?startdate=%s-%s-%s" % (
+        """
+        Given a day, return a URL to navigate to.
+        """
+        # This is a little hardcoded for my taste.
+        return ".?startdate=%s-%s-%s" % (
             day.year, 
             day.month,
             day.day,
         )
+        
+    occurrence_days = [o.start.date() for o in occurrence_qs]
+    def date_class_fn(day):
+        if day in occurrence_days:
+            return ['highlight']
+        else:
+            return []
 
     return calendar(
-        context, day=occurrences_or_date, 
+        context, day=date, 
         date_href_fn=date_href_fn,
+        date_class_fn=date_class_fn,
         month_href_fn=date_href_fn,
     )
 

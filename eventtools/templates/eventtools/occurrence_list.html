@@ -16,7 +16,7 @@
 
 	{% regroup occurrence_page by start_date as day_list %}
 	
-	{% nav_calendar occurrence_page.0 %}{# shows a nav calendar #}
+	{% nav_calendar selected_start occurrence_page %}{# shows a global nav calendar where dates in occurrence_page are highligted #}
 	
 	<ul class="days">
 		{% for day in day_list %}

@@ -1,0 +1,35 @@
+table.calendar td {
+	text-align: center;
+}
+
+table.calendar td span {
+	width: 2em;
+	display: block;
+}
+
+table.calendar td a {
+	display: block;
+	width: 2em;
+}
+
+table.calendar .today {
+	border: 1px solid #888;
+}
+
+table.calendar .saturday,
+table.calendar .sunday {
+	background-color: #eee;
+}
+
+table.calendar .highlight {
+	background-color: #ccc;
+}
+
+table.calendar .selected {
+	font-weight: bold;
+}
+
+table.calendar .last_month,
+table.calendar .next_month {
+	opacity: 0.4;
+}

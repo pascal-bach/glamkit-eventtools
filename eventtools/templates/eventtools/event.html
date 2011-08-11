@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{% load calendar %}
 
 {% block title %}{{ event.title }} :: {{ block.super }}{% endblock %}
 
@@ -6,6 +7,8 @@
 
 	<h1>{{ event.title }}</h1>
 	{% if perms.events.can_change_event %}<a href="{% url admin:events_event_change event.pk %}">edit</a>{% endif %}
+
+	{% nav_calendar event.complete_occurrences.0 event.complete_occurrences %}
 
 	<p class="season">When: {{ event.sessions|linebreaksbr }}<p>
 	

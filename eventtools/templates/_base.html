@@ -3,6 +3,12 @@
 	<head>
 		<title>{% block title %}{% endblock %}</title> 
 		{% block extrahead %}{% endblock %}
+	
+		{% block style %}
+			<link rel="stylesheet" href="{{ STATIC_URL }}eventtools/css/events.css">
+		{% endblock style %}
+
+				
 	</head>
 	
 	<body> 

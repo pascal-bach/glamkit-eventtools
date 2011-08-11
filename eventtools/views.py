@@ -24,15 +24,19 @@ class EventViews(object):
     def urls(self):
         from django.conf.urls.defaults import patterns, url
 
-        return patterns('',
-            url(r'^$', self.index, name='index'),
-            url(r'^(?P<event_slug>[-\w]+)/$', self.event, name='event'),
+        return (
+            patterns('',
+                url(r'^$', self.index, name='index'),
+                url(r'^(?P<event_slug>[-\w]+)/$', self.event, name='event'),
         
-            #ical - needs rethinking
-            # url(r'^ical\.ics$', self.occurrence_list_ical, name='occurrence_list_ical'),
-            # url(r'^(?P<event_slug>[-\w]+)/ical\.ics$', self.event_ical, name='event_ical'),
-            # url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/ical\.ics$', \
-            #     self.occurrence_ical, name='occurrence_ical'),
+                #ical - needs rethinking
+                # url(r'^ical\.ics$', self.occurrence_list_ical, name='occurrence_list_ical'),
+                # url(r'^(?P<event_slug>[-\w]+)/ical\.ics$', self.event_ical, name='event_ical'),
+                # url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_id>\d+)/ical\.ics$', \
+                #     self.occurrence_ical, name='occurrence_ical'),
+            ),
+            "events", # application namespace
+            "events", # instance namespace
         )
             
     #occurrence
