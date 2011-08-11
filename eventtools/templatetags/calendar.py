@@ -15,21 +15,25 @@ from eventtools.models import EventModel, OccurrenceModel
 
 register = template.Library()
 
-def DEFAULT_DATE_HREF_FN(day):
+def DATE_HREF_FACTORY(test_dates=True, dates=[]):
     """
-    Given a day, return a URL to navigate to.
+    If test_dates is True, then URLs will only be returned if the day is in the
+    dates iterable.
+    
+    If test_dates is False, URLs are always returned.
     """
-    return ".?startdate=%s-%s-%s" % (
-        day.year, 
-        day.month,
-        day.day,
-    )
-
-def NONE_FN(x):
-    return None
-
-def EMPTY_FN(x):
-    return []
+    def f(day):
+        """
+        Given a day, return a URL to navigate to.
+        """
+        if (test_dates and day in dates) or (not test_dates):
+            return ".?startdate=%s-%s-%s" % (
+                day.year, 
+                day.month,
+                day.day,
+            )
+        return None
+    return f
 
 def DATE_CLASS_HIGHLIGHT_FACTORY(dates, selected_day):
     def f(day):
@@ -59,9 +63,9 @@ class DecoratedDate(object):
                 
 def calendar(
         context, day=None,
-        date_class_fn=EMPTY_FN,
-        date_href_fn=NONE_FN,
-        month_href_fn=NONE_FN,
+        date_class_fn=None,
+        date_href_fn=None,
+        month_href_fn=None,
     ):
     """
     Creates an html calendar displaying one month, where each day has a link and
@@ -93,6 +97,16 @@ def calendar(
         'next_month' respectively.
 
     """
+    
+    if date_class_fn is None:
+        date_class_fn = lambda x: []
+        
+    if date_href_fn is None:
+        date_href_fn = lambda x: None
+
+    if month_href_fn is None:
+        month_href_fn = lambda x: None
+    
     today = datetime.date.today()
 
     if day is None:
@@ -160,53 +174,40 @@ def calendar(
 
 def nav_calendar(
         context, date=None, occurrence_qs=[],
-        date_href_fn=DEFAULT_DATE_HREF_FN,
-        month_href_fn=DEFAULT_DATE_HREF_FN,
+        date_href_fn=None,
+        month_href_fn=None,
         date_class_fn=None,
     ):
     """
     Renders a nav calendar for a date, and an optional occurrence_qs.
     Dates in the occurrence_qs are given the class 'highlight'.
     """
+    
     #TODO: allow dates, not just occurrence_qs
-    if date_class_fn is None and occurrence_qs:
+    if occurrence_qs:
         occurrence_days = [o.start.date() for o in occurrence_qs]
-        date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, date)
+    else:
+        occurrence_days = []
+    
+    if date_href_fn is None:
+        date_href_fn = DATE_HREF_FACTORY(dates=occurrence_days)
+
+    if month_href_fn is None:
+        month_href_fn = DATE_HREF_FACTORY(test_dates = False)
+        
+    if date_class_fn is None:
+        date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(dates=occurrence_days, selected_day = date)
 
     return calendar(
         context, day=date, 
         date_href_fn=date_href_fn,
         date_class_fn=date_class_fn,
-        month_href_fn=date_href_fn,
+        month_href_fn=month_href_fn,
     )
 
-def display_calendar(
-        context, date=None, occurrence_qs=[],
-        date_href_fn=NONE_FN,
-        month_href_fn=NONE_FN,
-        date_class_fn=None,
-    ):
-    """
-    Renders a display calendar for a date, and an optional occurrence_qs.
-    Dates in the occurrence_qs are given the class 'highlight'.
-    """
-            
-    #TODO: This can be merged into nav_calendar if we allow Nones.
-    #TODO: give each day a class (for javascript)
-    if date_class_fn is None and occurrence_qs:
-        occurrence_days = [o.start.date() for o in occurrence_qs]
-        date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, date)
-
-    return calendar(
-        context, day=date, 
-        date_href_fn=date_href_fn,
-        date_class_fn=date_class_fn,
-        month_href_fn=date_href_fn,
-    )
-
-def display_calendars(
+def nav_calendars(
         context, occurrence_qs=[],
-        date_href_fn=NONE_FN,
+        date_href_fn=None,
         date_class_fn=None,
     ):
     """
@@ -235,13 +236,12 @@ def display_calendars(
         )
         month += relativedelta(months=+1)
 
-    print calendars
 
     context.update({
         'calendars': calendars
     })
     return context
 
+register.inclusion_tag("eventtools/calendar/calendar.html", takes_context=True)(calendar)
 register.inclusion_tag("eventtools/calendar/calendar.html", takes_context=True)(nav_calendar)
-register.inclusion_tag("eventtools/calendar/calendar.html", takes_context=True)(display_calendar)
-register.inclusion_tag("eventtools/calendar/calendars.html", takes_context=True)(display_calendars)
+register.inclusion_tag("eventtools/calendar/calendars.html", takes_context=True)(nav_calendars)
