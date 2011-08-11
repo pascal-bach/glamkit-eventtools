@@ -1,4 +1,4 @@
-{% load i18n %}
-<tr> 
-	<th><a href="?startdate={{ month_links.prev|date:"Y-m-j" }}" title="{% trans "view previous month" %}">&lt;</a></th><th colspan="5">&nbsp;</th><th><a href="?startdate={{ month_links.next|date:"Y-m-j" }}" title="{% trans "view next month" %}">&gt;</a></th> 
-</tr> 
+<tr>
+	<th style="text-align:left" colspan="6">{% if prev_month.href %}<a href="{{ prev_month.href }}" title="{{ prev_month.date|date:"F Y" }}">&lt;</a>{% endif %}</th>
+	<th style="text-align:right">{% if next_month.href %}<a href="{{ next_month.href }}" title="{{ next_month.date|date:"F Y" }}">&gt;</a>{% endif %}</th>
+</tr>

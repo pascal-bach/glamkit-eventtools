@@ -1,9 +1,10 @@
 <table class="calendar">
 <thead>
+	<tr colspan="7">{{ weeks.0.6.date|date:"F Y" }}</tr>
 	{% include 'eventtools/calendar/_month_header.html' %}
 </thead>
 <tbody>
-	{% for week in month_weeks %}
+	{% for week in weeks %}
 		<tr> 
 			{% for day in week %}
 				{% include 'eventtools/calendar/_day.html' %}
@@ -11,7 +12,9 @@
 		</tr> 
 	{% endfor %}
 </tbody>
+{% if prev_month.href or next_month.href %}
 <tfoot>
 	{% include 'eventtools/calendar/_month_nav.html' %}
 </tfoot>
+{% endif %}
 </table>

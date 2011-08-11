@@ -1,9 +1,9 @@
 {% extends "_base.html" %}
+{% load calendar %}
 
 {% block extrahead %}
 	<link rel="profile" href="http://microformats.org/profile/hcalendar">
 {% endblock %}
-
 
 {% block content %}
 
@@ -15,6 +15,8 @@
 {% endcomment %}
 
 	{% regroup occurrence_page by start_date as day_list %}
+	
+	{% nav_calendar occurrence_page.0 %}{# shows a nav calendar #}
 	
 	<ul class="days">
 		{% for day in day_list %}
@@ -33,12 +35,12 @@
 		{% endfor %}
 	</ul>
 
-{% if occurrence_page %}
-<div class="pagination">
-	{% block pagination %}
-		{% include 'eventtools/_pagination.html' %}
-	{% endblock pagination %}
-</div>
-{% endif %}
+	{% if occurrence_page %}
+	<div class="pagination">
+		{% block pagination %}
+			{% include 'eventtools/_pagination.html' %}
+		{% endblock pagination %}
+	</div>
+	{% endif %}
 
 {% endblock %}

@@ -11,83 +11,138 @@ from django.template.context import RequestContext
 from django.template import TemplateSyntaxError
 
 from eventtools.conf import settings as eventtools_settings
-from eventtools.models import EventModel
+from eventtools.models import EventModel, OccurrenceModel
 
 register = template.Library()
 
-def make_calendar(context, date_classes):
+
+class DecoratedDate(object):
     """
-    Creates a configurable html calendar displaying one month.
+    A wrapper for date that has some css classes and a link, to use in rendering
+    that date in a calendar.
+    """
+    def __init__(self, date, href=None, classes=[]):
+        self.date = date
+        self.href = href
+        self.classes = classes
+    
+    def __unicode__(self):
+        if self.href:
+            return "%s (%s)" % (self.date, self.href)
+        return unicode(self.date)
+                
+def calendar(
+        context, day=None,
+        date_class_fn=lambda x: [],
+        date_href_fn=lambda x: "",
+        month_href_fn=lambda x: "",
+    ):
+    """
+    Creates an html calendar displaying one month, where each day has a link and
+    various classes, followed by links to the previous and next months.
     
     Arguments:
     
-    date_classes: a dictionary, containing:
-        ['month'] - a date in the month to be displayed (if it isn't given, today is assumed.
-        other entries in the dictionary are assumed to be lists of dates.
-        Each date in the month is compared with these lists. If the date is in the list, then a css class is given to that day, corresponding to the key of the dictionary. For example:
-        
-        ['selected'] = (d1, d2, ... dn)
-        
-        will mark d1..n with the css class 'selected'.
-        
-        A special case is the 'active' list. Dates in this list will be classed 'active' and will work as links.
-        
-    The class 'today' is given to today's date.
-    Every day is given the class of the day of the week 'monday' 'tuesday', etc.
-    Leading and trailing days are given the classes last_month and next_month respectively.
-    """
-    week_start = eventtools_settings.FIRST_DAY_OF_WEEK
-
-    cal = pycal.Calendar(week_start)
-
-    today = date.today()
-    month_day = date_classes.get('month', None)
-    if month_day is None:
-        month_day = today
-
-    # month_calendar is a list of the weeks in the month of the year as full weeks. Weeks are lists of seven day numbers
-    weeks = cal.monthdatescalendar(month_day.year, month_day.month)
-    
-    annotated_weeks = []
-    
-    for week in weeks:
-        annotated_week = []
-        for day in week:
-            classes = []
-            for css_class, css_dates in date_classes.iteritems():
-                if css_class != 'month': #ignore the month config
-                    if day in css_dates:
-                        classes.append(css_class)
-            # now add generic classes
-            if day == today:
-                classes.append('today')
-            if day.month != month_day.month:
-                if day < month_day:
-                    classes.append('last_month')
-                if day > month_day:
-                    classes.append('next_month')
-            #day of the week
-            classes.append(day.strftime('%A').lower())
-            annotated_week.append({'date': day, 'classes': classes})
-        annotated_weeks.append(annotated_week)
-    
-    prev = month_day+relativedelta(months=-1)
-    prev = date(prev.year, prev.month, 1)
-    
-    next = month_day+relativedelta(months=+1)
-    next = date(next.year, next.month, 1)
+    context:        context from the parent template
+    day:            a date or occurrence defining the month to be displayed
+                    (if it isn't given, today is assumed).
+    date_class_fn:  a function that returns an iterable of CSS classes,
+                    given a date.
+    date_href_fn:   a function that returns the url for a date, given a date
+    month_href_fn:  a function that returns the url for a date, given a date
+                    (which will be the first day of the next and previous
+                    months)
                     
-    links = {'prev': prev, 'next': next }
 
+    Automatic classes:
     
+        The class 'today' is given to today's date.
+
+        Every day is given the class of the day of the week 'monday' 'tuesday', 
+        etc.
+
+        Leading and trailing days are given the classes 'last_month' and 
+        'next_month' respectively.
+
+    """
+    today = date.today()
+
+    if day is None:
+        day = today
+    else:
+        try:
+            day = day[0]
+        except TypeError:
+            pass
+        
+    if isinstance(day, OccurrenceModel):
+        day = day.start.date()
+
+    cal = pycal.Calendar(eventtools_settings.FIRST_DAY_OF_WEEK)
+    # cal is a list of the weeks in the month of the year as full weeks. 
+    # Weeks are lists of seven dates
+    weeks = cal.monthdatescalendar(day.year, day.month)
+    
+    # Transform into decorated dates
+    decorated_weeks = []
+    for week in weeks:
+        decorated_week = []
+        for wday in week:
+            classes = date_class_fn(wday)
+            if wday == today:
+                classes.append('today')
+            if wday == day:
+                classes.append('selected')
+            if wday.month != day.month:
+                if wday < day:
+                    classes.append('last_month')
+                if wday > day:
+                    classes.append('next_month')
+            #day of the week class
+            classes.append(wday.strftime('%A').lower())
+            
+            decorated_week.append(
+                DecoratedDate(
+                    date=wday, href=date_href_fn(wday), classes=classes
+                )
+            )
+        decorated_weeks.append(decorated_week)
+
+    prev = day+relativedelta(months=-1)
+    prev_date = date(prev.year, prev.month, 1)
+    decorated_prev_date = DecoratedDate(
+        date=prev_date, href=month_href_fn(prev_date)
+    )
+    
+    next = day+relativedelta(months=+1)
+    next_date = date(next.year, next.month, 1)
+    decorated_next_date = DecoratedDate(
+        date=next_date, href=month_href_fn(next_date)
+    )
+
 
     context.update({
-        'month_day': month_day,
-        'month_weeks': annotated_weeks,
-        'month_links': links,
+        'weeks': decorated_weeks,
+        'prev_month': decorated_prev_date,
+        'next_month': decorated_next_date,
     })
     
-    return {}
+    return context
 
-#workarond for takes_context
-register.inclusion_tag('eventtools/_empty_.html', takes_context=True)(make_calendar)
+def nav_calendar(context, occurrences_or_date=None):
+    def date_href_fn(day):
+        #TODO: make url reverse!
+        return "/events?startdate=%s-%s-%s" % (
+            day.year, 
+            day.month,
+            day.day,
+        )
+
+    return calendar(
+        context, day=occurrences_or_date, 
+        date_href_fn=date_href_fn,
+        month_href_fn=date_href_fn,
+    )
+
+#workaround for takes_context - renders a null template!
+register.inclusion_tag("eventtools/calendar/calendar.html", takes_context=True)(nav_calendar)
