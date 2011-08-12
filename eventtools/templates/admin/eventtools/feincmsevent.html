@@ -3,8 +3,15 @@
 {# django include/ssi tags don't allow block definition. This is exactly identical to the bottom of event.html #}
 {% load i18n %}
 {% load mptt_tags %}
+
+{% block extrahead %}
+	{{ block.super }}
+	<script type="text/javascript" src="{{ STATIC_URL }}eventtools/js/admin.js"></script>
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
+
 <style type="text/css">
 ins, del {
 text-decoration:none;

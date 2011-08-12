@@ -265,10 +265,12 @@ class EventModel(MPTTModel):
     
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
     title = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField("URL name", unique=True, help_text="This is used in\
+     the event's URL, and should be unique and unchanging.")
     season_description = models.CharField(_("season"), blank=True, null=True, 
         max_length=200, help_text="a summary description of when this event \
-        is on (one will be generated from the occurrences if not provided)"
+        is on (e.g. 24 August - 12 September 2012). One will be generated from \
+        the occurrences if not provided)"
     )
     sessions_description = models.TextField(_("sessions"), blank=True,
         null=True, help_text="a more detailed description of when sessions are\
