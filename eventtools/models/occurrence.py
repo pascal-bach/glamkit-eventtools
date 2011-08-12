@@ -372,9 +372,17 @@ class OccurrenceModel(models.Model):
     """
     An abstract model for an event occurrence.
     
-    Implementing subclasses should define 'event' ForeignKey to an EventModel subclass. The related_name for the ForeignKey should be 'occurrences'.
+    Implementing subclasses should define an 'event' ForeignKey to an EventModel
+    subclass. The related_name for the ForeignKey should be 'occurrences'.
+
+    Implementing subclasses should define a 'generated_by' ForeignKey to a 
+    GeneratorModel subclass. The related_name for the ForeignKey should be
+    'occurrences'. In almost all cases, the FK should be optional.
 
     event = models.Foreignkey(SomeEvent, related_name="occurrences")
+    generated_by = models.ForeignKey(
+        SomeGenerator, blank=True, null=True, related_name="occurrences"
+    )
     """
     __metaclass__ = OccurrenceModelBase
     start = models.DateTimeField(db_index=True)

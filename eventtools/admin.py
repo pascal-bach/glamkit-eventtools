@@ -10,6 +10,7 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.http import QueryDict
 from django.shortcuts import get_object_or_404, redirect
+from django.forms.models import BaseInlineFormSet
 from mptt.forms import TreeNodeChoiceField
 from mptt.admin import MPTTModelAdmin
 
@@ -134,11 +135,19 @@ class DateAndMaybeTimeField(forms.SplitDateTimeField):
             return datetime.datetime.combine(*data_list)
         return None
 
+class OccurrenceInlineFormSet(BaseInlineFormSet):
+    def __init__(self, *args, **kwargs):
+        kwargs['queryset'] = kwargs['queryset'].filter(generated_by__isnull=True)
+        super(OccurrenceInlineFormSet, self).__init__(*args, **kwargs)
+
+ 
+
 def OccurrenceInline(OccurrenceModel):
     class _OccurrenceInline(admin.TabularInline):
         model = OccurrenceModel
+        formset = OccurrenceInlineFormSet
         extra = 1
-        fields = ('start', 'end',)
+        fields = ('start', 'end',)        
         formfield_overrides = {
             models.DateTimeField: {'form_class': DateAndMaybeTimeField},
         }        

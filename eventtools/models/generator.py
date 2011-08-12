@@ -27,6 +27,8 @@ class GeneratorModel(models.Model):
     class Meta:
         abstract = True
         ordering = ('event_start',)
+        verbose_name = "Repeating Occurrence"
+        verbose_name_plural = "Repeating Occurrences"
 
     def __unicode__(self):
         return u"%s, %s" % (self.event, self.robot_description())
@@ -169,7 +171,7 @@ class GeneratorModel(models.Model):
                 if self.OccurrenceModel().objects.filter(event=self.event, start=start, end=end).count():
                     return
             #good to go
-            return self.occurrences.create(event=self.event, start=start, end=end) #generator = self
+            return self.occurrences.create(event=self.event, start=start, end=end, generated_by = self)
         # it's an exception, don't generate it.
         return
     
