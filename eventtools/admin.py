@@ -168,7 +168,6 @@ def GeneratorInline(GeneratorModel):
     class _GeneratorInline(admin.TabularInline):
         model = GeneratorModel
         extra = 0
-        exclude = ('exceptions', ) #JSON exceptions are going the way of the dinosaurs
         formfield_overrides = {
             models.DateTimeField: {'form_class': DateAndMaybeTimeField},
         }        
