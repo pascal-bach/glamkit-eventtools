@@ -99,7 +99,7 @@ def calendar(
     """
     
     if date_class_fn is None:
-        date_class_fn = lambda x: []
+        date_class_fn = lambda x: set()
         
     if date_href_fn is None:
         date_href_fn = lambda x: None
@@ -130,7 +130,7 @@ def calendar(
     for week in weeks:
         decorated_week = []
         for wday in week:
-            classes = date_class_fn(wday)
+            classes = set(date_class_fn(wday))
             if wday == today:
                 classes.add('today')
             if wday.month != day.month:
@@ -221,8 +221,11 @@ def nav_calendars(
         date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, None)
     
     calendars = []
-    first_date = occurrence_qs[0].start.date()
-    last_date = occurrence_qs.reverse()[0].start.date()
+    if occurrence_qs.count() > 0:
+        first_date = occurrence_qs[0].start.date()
+        last_date = occurrence_qs.reverse()[0].start.date()
+    else:
+        first_date = last_date = datetime.date.today()
     first_month = datetime.date(first_date.year, first_date.month, 1)
     month = first_month
     
