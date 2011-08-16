@@ -6,8 +6,6 @@ from django.core import exceptions
 
 from dateutil import rrule
 
-from nosj.fields import JSONField
-
 from eventtools.utils import datetimeify
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import (
@@ -16,50 +14,26 @@ from eventtools.utils.pprint_timespan import (
 from datetime import date, time, datetime, timedelta
 
 class GeneratorModel(models.Model):
+    """
+    Generates occurrences.
+    """
 
     #define a FK called 'event' in the subclass
     event_start = models.DateTimeField(db_index=True)
     event_end = models.DateTimeField(blank=True, db_index=True)
     rule = models.ForeignKey("eventtools.Rule")
     repeat_until = models.DateTimeField(null = True, blank = True, help_text=_(u"These start dates are ignored for one-off events."))
-    exceptions = JSONField(null=True, blank=True, help_text=_(u"These dates are skipped by the generator."), default={})
-    
+
     class Meta:
         abstract = True
         ordering = ('event_start',)
-        verbose_name = "Repeating Occurrence"
-        verbose_name_plural = "Repeating Occurrences"
+        verbose_name = "repeating occurrence"
+        verbose_name_plural = "repeating occurrences"
 
     def __unicode__(self):
         return u"%s, %s" % (self.event, self.robot_description())
     
-    def clean(self):
-        if self.event_end is None:
-            self.event_end = self.event_start
-    
-        if self.event_start > self.event_end:
-            raise exceptions.ValidationError('start must be earlier than end')
-        if self.repeat_until is not None and \
-                self.repeat_until < self.event_end:
-            raise exceptions.ValidationError(
-                'repeat_until must not be earlier than start')
-        if self.repeat_until is not None and self.rule is None:
-            raise exceptions.ValidationError(
-                'repeat_until has no effect without a repetition rule')
-        # This data entry mistake is common enough to justify a slight hack
-        if self.rule and self.rule.frequency == 'DAILY' \
-                and self.event_end - self.event_start > timedelta(1):
-            raise exceptions.ValidationError(
-                'Daily events cannot span multiple days; the event start and \
-                end dates should be the same.'
-            )
-        super(GeneratorModel, self).clean()
-    
-    
-    @transaction.commit_on_success()
-    def save(self, *args, **kwargs):
-        generate = kwargs.pop('generate', True)
-        
+    def clean(self, ExceptionClass=exceptions.ValidationError):
         if self.event_end is None:
             self.event_end = self.event_start
     
@@ -67,115 +41,79 @@ class GeneratorModel(models.Model):
         self.event_end = datetimeify(self.event_end, clamp="max")
         if self.repeat_until is not None:
             self.repeat_until = datetimeify(self.repeat_until, clamp="max")
-    
+
         if self.event_end.time == time.min:
             self.event_end.time == time.max
+
+        if not self.rule_id:
+            raise ExceptionClass('a rule must be supplied')
     
         if self.event_start > self.event_end:
-            raise AttributeError('Start must be earlier than end.')
-    
-        if self.repeat_until is not None and self.repeat_until < self.event_start:
-            raise AttributeError('Repeat_until must not be earlier than start.')
-        
-        if self.repeat_until is not None and self.rule is None:
-            raise AttributeError('Repeat_until has no effect without a repetition rule.')
-        
-        if self.rule and self.rule.frequency == 'DAILY' \
-                and self.event_end - self.event_start > timedelta(1):
-            raise AttributeError('Daily events cannot span multiple days; the event start and end dates should be the same.')
-        
-        """
-        When you change a generator and save it, it updates its existing occurrences according to the following:
-        
-        * If a repetition rule was changed:
-            don't try to update occurrences, but run generate() to make the new occurrences.
-            ie don't update anything, just generate
-        * If a repeat_until rule was changed:
-            don't try to delete out-of-bounds occurrences, but run generate() to make the new occurrences.
-            out-of-bounds occurrences are left behind.
-            ie update as normal
+            raise ExceptionClass('start must be earlier than end')
+        if self.repeat_until is not None and \
+                self.repeat_until < self.event_end:
+            raise ExceptionClass(
+                'repeat_until must not be earlier than start')
+        # This data entry mistake is common enough to justify a slight hack.
+        if self.rule.frequency == 'DAILY' \
+                and self.event_duration() > timedelta(1):
+            raise ExceptionClass(
+                'Daily events cannot span multiple days; the event start and \
+                end dates should be the same.'
+            )
             
-        * If start date (or datetime) was changed:
-            run the old rule, and timeshift all occurrences produced by the old rule.
+        self.is_clean = True
+        super(GeneratorModel, self).clean()
     
-        * Else if only start time was changed:
-            update all the generator's occurrences that have the same start time.
-            
-        * If end date or (or datetime) was changed:
-            run the (new) generator and update the end date of all occurrences produced by the rule
-        
-        * If only end time was changed:
-            update all the generator's occurrences that have the same end time.
+    
+    @transaction.commit_on_success()
+    def save(self, *args, **kwargs):
+        """
+        Generally (and for a combination of field changes), we take a
+        two-pass approach:
+    
+         1) First update existing occurrences to match update-compatible fields.
+         2) Then synchronise the candidate occurrences with the existing
+            occurrences.
+            * For candidate occurrences that exist, do nothing.
+            * For candidate occurrences that do not exist, add them.
+            * For existing occurrences that are not candidates, unhook them from
+                the generator.
+
+        Finally, we also update other generators, because they might have had
+        clashing occurrences which no longer clash.
         """
         
-        if self.pk: #it already exists so could potentially be changed
-            saved_self = type(self).objects.get(pk=self.pk)
-            if self.rule == saved_self.rule:
-                start_shift = self.event_start - saved_self.event_start
-                end_shift = self.event_end - saved_self.event_end
-                duration = self.event_duration
+        cascade = kwargs.pop('cascade', True)
+        
+        if not getattr(self, 'is_clean', False):
+            # if we're saving directly, the ModelForm clean isn't called, so
+            # we do it here.
+            self.clean(ExceptionClass=AttributeError)
+        
+        # Occurrences updates/generates
+        if self.pk:
+            self._update_existing_occurrences() # need to do this before save, so we can detect changes
+
+        r = super(GeneratorModel, self).save(*args, **kwargs)
+        self._sync_occurrences() #need to do this after save, so we have a pk to hang new occurrences from.
     
-                if start_shift:
-                    if self.event_start.date() != saved_self.event_start.date(): # we're shifting days (and times)
-                        occurrence_set = self.occurrences.filter(start__in=list(saved_self.generate_dates()))
-                    elif self.event_start.time() != saved_self.event_start.time(): #we're only shifting times
-                        occurrence_set = [o for o in self.occurrences.all() if o.start.time() == saved_self.event_start.time()]
-    
-                    for occ in occurrence_set:
-                        occ.start += start_shift
-                        occ.end = occ.start + duration
-                        occ.save()
-    
-                elif end_shift: #only end has changed (both is covered above)            
-                    if self.event_end.date() != saved_self.event_end.date(): # we're shifting days (and times)
-                        occurrence_set = self.occurrences.filter(start__in=list(self.generate_dates()))
-                    elif self.event_end.time() != saved_self.event_end.time(): #we're only shifting times
-                        occurrence_set = [o for o in self.occurrences.all() if o.end.time() == saved_self.event_end.time()]
-                    
-                    for occ in occurrence_set:
-                        occ.end += end_shift
-                        occ.save()
-                
-    
-        super(GeneratorModel, self).save(*args, **kwargs)
-        if generate:
-            self.generate() #need to do this after save, so we have ids.
-    
-    @property
-    def all_day(self):
-        return self.event_start.time() == time.min and self.event_end.time() == time.max
-    
-    @property
+        # finally, we should also update other generators, because they might 
+        # have had clashing occurrences
+        if cascade:
+            for generator in self.event.generators.exclude(pk=self.pk):
+                generator.save(cascade=False)
+        
+        return r
+        
     def event_duration(self):
         return self.event_end-self.event_start
     
     @classmethod
-    def OccurrenceModel(cls):
-        return cls.occurrences.related.model
-    
-    def create_occurrence(self, start, end=None, honour_exceptions=False):
-        """
-        Occurrences are only generated if all of the following are true:
-            * the start time isn't in the list of exceptions (unless we're 'force'-creating)
-            * the occurrence hasn't already been saved by this generator (regardless of the event it is now assigned to)
-            * the occurrence doesn't already exist for this event (regardless of the generator it came from)
-        """
-        if not honour_exceptions or (honour_exceptions and not self.is_exception(start)):
-            
-            if settings.ALLOW_CLASHING_OCCURRENCES:
-                # if this occurrence is already genecrated by this generator, do nothing
-                if self.occurrences.filter(start=start, end=end).count():
-                    return
-            else:                    
-                # if this occurrence exists at all, do nothing (it's a clash and they're not allowed)
-                if self.OccurrenceModel().objects.filter(event=self.event, start=start, end=end).count():
-                    return
-            #good to go
-            return self.occurrences.create(event=self.event, start=start, end=end, generated_by = self)
-        # it's an exception, don't generate it.
-        return
-    
-    def generate_dates(self):
+    def EventModel(cls):
+        return cls._meta.get_field('event').rel.to
+        
+    def _generate_dates(self):
         if self.rule is None:
             yield self.event_start
             raise StopIteration
@@ -183,7 +121,7 @@ class GeneratorModel(models.Model):
         rule = self.rule.get_rrule(dtstart=self.event_start)
         date_iter = iter(rule)
         drop_dead_date = self.repeat_until or datetime.now() + settings.DEFAULT_GENERATOR_LIMIT
-        
+                
         while True:
             d = date_iter.next()
             if d > drop_dead_date:
@@ -191,25 +129,132 @@ class GeneratorModel(models.Model):
             yield d
     
     @transaction.commit_on_success()
-    def generate(self):
+    def _update_existing_occurrences(self):
         """
-        generate my occurrences
+        When you change a generator and save it, it updates existing occurrences
+        according to the following rules:
+        
+        Generally, we never automatically delete occurrences, we unhook them
+        from the generator, and make them manual. This is to prevent losing
+        information like tickets sold or shout-outs. We leave implementors to
+        decide the workflow in these cases. We want to minimise the number of
+        events that are unhooked, however. So:
+    
+         * If start time or end date or time is changed, then no occurrences are
+           added or removed - we timeshift all occurrences. We assume that
+           visitors/ticket holders are alerted to the time change elsewhere.
+    
+         * If other fields are changed - repetition rule, repeat_until, start
+           date - then there is a chance that Occurrences will be added or
+           removed.
+    
+         * Occurrences that are added are fine, they are added in the normal
+           way.
+           
+         * Occurrences that are removed are unhooked, for reasons
+           described above.
         """
+        
+        """
+        Pass 1)
+        if start date or time is changed:
+            update the start times of my occurrences
+        if end date or time is changed:
+            update the end times of my occurrences
+                        
+        """
+        
+        # TODO: it would be ideal to minimise the consequences of shifting one
+        # occurrence into another - ie to leave most occurrences untouched and 
+        # to create only new ones and unhook ungenerated ones.
+        # I tried this by using start date (which is unique per generator) as
+        # a nominal 'key', but it gets fiddly when you want to vary the end
+        # date to before the old start date. For now we'll just update the dates
+        # and times.
+
+        saved_self = type(self).objects.get(pk=self.pk)
+        
+        start_shift = self.event_start - saved_self.event_start
+        end_shift = self.event_end - saved_self.event_end
+        duration = self.event_duration()
+        
+        if start_shift or end_shift:
+            for o in self.occurrences.all():
+                o.start += start_shift
+                o.end = o.start + duration
+                o.save()
+
     
-        if self.rule is None: #the only occurrence in the village, boyo
-            self.create_occurrence(start=self.event_start, end=self.event_end, honour_exceptions=True)
-            return
+    @transaction.commit_on_success()
+    def _sync_occurrences(self):
     
-        event_duration = self.event_duration
-        for o_start in self.generate_dates():
-            o_end = o_start + event_duration
-            self.create_occurrence(start=o_start, end=o_end, honour_exceptions=True)
+        """
+            * For candidate occurrences that exist, do nothing.
+            * For candidate occurrences that do not exist, add them.
+            * For existing occurrences that are not candidates, unhook them from the generator
+            
+        In detail:
+        Get a list, A, of already-generated occurrences.
+        
+        Generate candidate Occurrences.
+        For each candidate Occurrence:
+            if it exists for the event:
+                if I created it, unhook, and remove from the list A.
+                else do nothing
+            if it is an exclusion, do nothing
+            otherwise create it.
+            
+        The items remaining in list A are 'orphan' occurrences, that were
+        previously generated, but would no longer be. These are unhooked from
+        the generator.
+        """
+        
+        all_occurrences = self.event.occurrences.all() #regardless of generator
+        unaccounted_for = set(self.occurrences.all())
+        
+        event_duration = self.event_duration()
+        
+        for start in self._generate_dates():
+            # if the proposed occurrence exists, then don't make a new one.
+            # However, if it belongs to me: 
+            #       and if it is marked as an exclusion:
+            #           do nothing (it will later get unhooked)
+            #       else:
+            #           remove it from the set of unaccounted_for
+            #           occurrences so it stays hooked up
+            
+            try:
+                o = all_occurrences.filter(start=start)[0]
+                if o.generated_by == self:
+                    if not o.is_exclusion():
+                        unaccounted_for.discard(o)
+                continue
+            except IndexError:
+                # no occurrence exists yet.
+                pass
+
+            # if the proposed occurrence is an exclusion, don't save it.
+            if self.event.exclusions.filter(
+                event=self.event, start=start
+            ).count():
+                continue            
+
+            #OK, we're good to go.
+            end = start + event_duration
+            o = self.occurrences.create(event=self.event, start=start, end=end) #implied generated_by = self
     
+        # Finally, unhook any unaccounted_for occurrences
+        for o in unaccounted_for:
+            o.generated_by = None
+            o.save()
+    
+    # This is scrappy
     def robot_description(self):
         return u'\n'.join(
             [pprint_datetime_span(start, end) + repeat_description \
             for start, end, repeat_description in self.get_spans()])
     
+    # This is scrappy too
     def get_spans(self):
         if self.rule:
             if self.occurrences.count() > 3:
@@ -225,34 +270,3 @@ class GeneratorModel(models.Model):
                 return [(occ.start, occ.end, u'') for occ in self.occurrences.all()]
         else:
             return [(self.event_start, self.event_end, u''),]
-        
-    
-    def is_exception(self, dt):
-        if self.exceptions is None:
-            self.reset_exceptions()
-        return self.exceptions.has_key(dt.isoformat())
-    
-    def add_exception(self, dt):
-        if self.exceptions is None:
-            self.reset_exceptions()
-        
-        self.exceptions[dt.isoformat()] = True
-        self.save(generate=False)       
-    
-    def remove_exception(self, dt):
-        if self.exceptions is None:
-            self.reset_exceptions()
-        if self.is_exception(dt):
-            del self.exceptions[dt.isoformat()]
-            self.save(generate=False)
-    
-    def reset_exceptions(self):
-        self.exceptions = {}
-        self.save(generate=False)
-    
-    def reload(self):
-        """
-        Call with x = x.reload() - it doesn't change itself
-        """
-        return type(self)._default_manager.get(pk=self.pk)
-

@@ -307,7 +307,7 @@ class OccurrenceQuerySetFN(object):
         Return a queryset corresponding to the events matched by these occurrences.
         """
         event_ids = self.values_list('event_id', flat=True).distinct()
-        return self.model.Event()._event_manager.filter(id__in=event_ids)
+        return self.model.EventModel()._event_manager.filter(id__in=event_ids)
         
     def from_GET(self, GET={}):
         fr, to = parse_GET_date(GET)
@@ -344,30 +344,6 @@ class OccurrenceManager(models.Manager):
     def get_query_set(self): 
         return OccurrenceQuerySet(self.model)
 
-class OccurrenceModelBase(ModelBase):
-
-    def __new__(meta, class_name, bases, class_dict):
-        """
-        Create subclasses of GeneratorModel. This:
-         - registers signals for when related occurrences are saved or deleted.
-        """
-        cls = super(OccurrenceModelBase, meta).__new__(meta, class_name, bases, class_dict)
-                
-        try:
-            OccurrenceModel
-        except NameError:
-            # We're defining the base class right now, so don't do anything
-            # We only want to add this stuff to the subclasses.
-            # (Otherwise if field names are customized, we'll end up adding two
-            # copies)
-            pass
-        else:
-            # Set up signal receivers
-            pass
-            
-        signals.pre_delete.connect(cls._pre_delete, sender=cls)
-        return cls
-
 class OccurrenceModel(models.Model):
     """
     An abstract model for an event occurrence.
@@ -383,8 +359,8 @@ class OccurrenceModel(models.Model):
     generated_by = models.ForeignKey(
         SomeGenerator, blank=True, null=True, related_name="occurrences"
     )
+    
     """
-    __metaclass__ = OccurrenceModelBase
     start = models.DateTimeField(db_index=True)
     end = models.DateTimeField(blank=True, db_index=True)
         
@@ -393,6 +369,7 @@ class OccurrenceModel(models.Model):
     class Meta:
         abstract = True
         ordering = ('start', 'end',)
+        unique_together = ('event', 'start', )
 
     def clean(self):
         if self.end is None:
@@ -414,30 +391,13 @@ class OccurrenceModel(models.Model):
         if self.start > self.end:
             raise AttributeError('start must be earlier than end')
         
-        #if my time is being changed, or if i'm being detached from the generator, add the old time to the generator's exceptions.
-        #TODO: add the new time if self.start is in exceptions and durations are equal
-        if hasattr(self, 'generator') and self.pk:
-            saved_self = type(self).objects.get(pk=self.pk)
-            if self.generator != saved_self.generator or self.start != saved_self.start or self.end != saved_self.end:
-                saved_self.generator.add_exception(saved_self.start)
-
-            if self.generator is not None and self.generator.is_exception(self.start):
-                if self.duration == self.generator.event_duration:
-                    self.generator.remove_exception(self.start)
-
         super(OccurrenceModel, self).save(*args, **kwargs)
 
-    @staticmethod #connected in the metaclass
-    def _pre_delete(sender, **kwargs):
-        occ = kwargs['instance']
-        if hasattr(occ, 'generator') and occ.generator is not None:
-            occ.generator.add_exception(occ.start)
-       
     def __unicode__(self):
         return u"%s: %s" % (self.event, self.timespan_description())
         
     @classmethod
-    def Event(cls):
+    def EventModel(cls):
         return cls._meta.get_field('event').rel.to
     
     @property
@@ -495,7 +455,14 @@ class OccurrenceModel(models.Model):
     @property
     def now_on(self):
         return self.has_started and not self.has_finished
+    
+    def is_exclusion(self):
+        qs = self.event.exclusions.filter(start=self.start)
+        if qs.count():
+            return True
+        return False
         
+    
     def time_to_go(self):
         """
         If self is in future, return + timedelta.

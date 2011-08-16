@@ -8,6 +8,7 @@ from eventtools.utils import datetimeify
 from dateutil.relativedelta import relativedelta
 from django.core.urlresolvers import reverse
 from eventtools.models import Rule
+from django.core.exceptions import ValidationError
 
 class TestGenerators(AppTestCase):
     
@@ -40,43 +41,37 @@ class TestGenerators(AppTestCase):
 
         Occurrences are saved to the database, and have an FK to the generator that
         did so. The FK can be set to None so that an occurrence can be detatched from a generator.
-        
-        Generators have a robot description.
         """
 
-        # A generator without a rule generates one occurrence.
-        self.ae(self.one_off_generator.occurrences.count(), 1)
-        self.ae(self.weekly_generator.occurrences.count(), 5)
-        
         self.assertTrue(self.endless_generator.occurrences.count() > 52)
-        
-        #test re-save event resaves 'boundless' generators.
+
+        #test re-save event resaves 'boundless' generators, by deleting them first.
         self.endless_generator.occurrences.all().delete()
-        self.endless_generator.reset_exceptions()
         self.ae(self.endless_generator.occurrences.count(), 0)
         self.bin_night.save()
         self.assertTrue(self.endless_generator.occurrences.count() > 52)
 
-        #test dupes are not created.
-        self.ae(self.dupe_weekly_generator.occurrences.count(), 0)
-
-        self.ae(self.weekly_generator.robot_description(), "1 January 2010, 10:30-11:30am, repeating weekly until 29 January 2010")
-
+        #test dupes were not created.
+        
+        # have we got some weekly occurrences?
+        self.ae(self.weekly_generator.occurrences.count(), 5)
+        
+        daily_starts = [x.start for x in self.endless_generator.occurrences.all()]
+        weekly_starts = [x.start for x in self.weekly_generator.occurrences.all()]
+        
+        for s in weekly_starts:
+            self.assertTrue(s not in daily_starts)
+        
     def test_all_day(self):
         """
         If the start time of a generator is time.min and the end time is time.max, then the generator generates all_day
-        occurrences. If the start time of a generator is time.min and the end time is time.max and the repetition rule is
-        hourly, then the generator generates one all_day occurrences followed by (e.g. 23 timed occurrences).
+        occurrences.
         """
-        
-        self.ae(self.all_day_generator.all_day, True)
-        self.ae(self.weekly_generator.all_day, False)
         
         self.ae(self.all_day_generator.event_start, datetime(2010, 1, 4, 0, 0))
         self.ae(self.all_day_generator.event_end, datetime.combine(date(2010,1,4), time.max) )
     
-        self.ae(self.all_day_generator.occurrences.reverse()[0].start, datetime.combine(date(2010,1,25), time.min) )
-        self.ae(self.all_day_generator.occurrences.reverse()[0].end, datetime.combine(date(2010,1,25), time.max) )
+        [self.ae(x.all_day, True) for x in self.all_day_generator.occurrences.all()]
                 
     def test_creation(self):
         """
@@ -97,283 +92,580 @@ class TestGenerators(AppTestCase):
         dt2 = datetime.combine(d2, t2)
 
         #datetimes
-        g = e.generators.create(event_start=dt1, event_end=dt2)
+        g = e.generators.create(event_start=dt1, event_end=d1max, rule=self.yearly)
         self.ae(g.event_start, dt1)
-        self.ae(g.event_end, dt2)
+        self.ae(g.event_end, d1max)
 
-        g = e.generators.create(event_start=dt1)
+        g = e.generators.create(event_start=dt1, rule=self.yearly)
         self.ae(g.event_start, dt1)
         self.ae(g.event_end, dt1)
 
-        g = e.generators.create(event_start=d1min)
+        g = e.generators.create(event_start=d1min, rule=self.yearly)
         self.ae(g.event_start, d1min)
         self.ae(g.event_end, d1max)
 
         
         #dates
-        g = e.generators.create(event_start=d1)
+        g = e.generators.create(event_start=d1, rule=self.yearly)
         self.ae(g.event_start, d1min)
         self.ae(g.event_end, d1max)
 
-        g = e.generators.create(event_start=d1, event_end=d2)
+        g = e.generators.create(event_start=d1, event_end=d2, rule=self.yearly)
         self.ae(g.event_start, d1min)
         self.ae(g.event_end, d2max)
 
         #combos
-        g = e.generators.create(event_start=dt1, event_end=d2)
+        g = e.generators.create(event_start=dt1, event_end=d2, rule=self.yearly)
         self.ae(g.event_start, dt1)
         self.ae(g.event_end, d2max)
         
-        g = e.generators.create(event_start=d1, event_end=dt2)
+        g = e.generators.create(event_start=d1, event_end=dt2, rule=self.yearly)
         self.ae(g.event_start, d1min)
         self.ae(g.event_end, dt2)
         
         # Missing event_start date.
-        self.assertRaises(TypeError, e.generators.create, **{'event_end':dt1})
-        self.assertRaises(TypeError, e.generators.create, **{'event_end':d1})
+        self.assertRaises(
+            TypeError,
+            e.generators.create, **{'event_end':dt1, 'rule': self.yearly}    
+        )
+        self.assertRaises(
+            TypeError,
+            e.generators.create, **{'event_end':d1, 'rule': self.yearly}
+        )
+
+        # Missing rule.
+        self.assertRaises(
+            AttributeError,
+            e.generators.create, **{'event_start':dt1, }    
+        )
+
         
         # Invalid event_start value.
-        self.assertRaises(TypeError, e.generators.create, **{'event_start':t1})
-        self.assertRaises(TypeError, e.generators.create,
+        self.assertRaises(
+            TypeError, 
+            e.generators.create, **{'event_start':t1, 'rule': self.yearly}
+        )
+        self.assertRaises(
+            TypeError,
+            e.generators.create,
             event_start=t1,
-            event_end=d1)
-        self.assertRaises(TypeError, e.generators.create,
+            event_end=d1, rule=self.yearly
+        )
+        self.assertRaises(
+            TypeError,
+            e.generators.create,
             event_start=t1,
-            event_end=dt1)
+            event_end=dt1, rule=self.yearly
+        )
 
         # Invalid event_end values.
-        self.assertRaises(TypeError, e.generators.create, **{'event_end':t1})
-        self.assertRaises(TypeError, e.generators.create,
-            event_start=d1,
-            event_end=t1)
-        self.assertRaises(TypeError, e.generators.create,
-            event_start=dt1,
-            event_end=t2)
+        self.assertRaises(TypeError,
+            e.generators.create, **{'event_end':t1, 'rule': self.yearly})
+        self.assertRaises(TypeError,
+            e.generators.create, event_start=d1, event_end=t1, rule=self.yearly)
+        self.assertRaises(TypeError,
+            e.generators.create, event_start=dt1, event_end=t2, rule=self.yearly)
         
-        # event_start date later than event_end date.
-        self.assertRaises(AttributeError, e.generators.create,
+         # event_start date later than event_end date.
+        self.assertRaises(
+            AttributeError,
+            e.generators.create,
             event_start=dt2,
-            event_end=dt1)
-        self.assertRaises(AttributeError, e.generators.create,
-            event_start=d2,
-            event_end=dt1)
-        self.assertRaises(AttributeError, e.generators.create,
-            event_start=d2,
-            event_end=d1)
-         
-        self.assertRaises(AttributeError, e.generators.create,
-            event_start=dt1,
-            event_end=dt2,
-            repeat_until=dt2)
-        
-    def test_exceptions(self):
-        """
-        If an occurrence is deleted, that occurrence's datetimes are added to the generator's exceptions. That prevents
-        deleted occurrences from being regenerated.
-        
-        If an occurrence's generator FK is changed, that occurrence is added as an exception to the generator. That
-        prevents reassigned/detatched occurrences from being regenerated.
-        
-        If an occurrence's event FK is changed, that occurrence is NOT added as an exception to the generator. That
-        allows occurrences to be reassigned to eventvariations and for the generator to still apply.
-        """
-        
-        #try with deleting
-        self.ae(self.weekly_generator.exceptions, {})
-
-        byebye_occ = self.weekly_generator.occurrences.all()[0]
-        sdate = byebye_occ.start
-        byebye_occ.delete()
-        
-        #check it gets added to exceptions
-        self.weekly_generator = self.weekly_generator.reload()
-        self.ae(self.weekly_generator.exceptions.keys(), [sdate.isoformat(),])
-        
-        self.weekly_generator.generate()
-        
-        self.ae(self.weekly_generator.occurrences.filter(start=sdate).count(), 0, "The exception"
-            " was not parsed properly")
-        
-        #now try with generator reassignment
-        byebye_occ2 = self.weekly_generator.occurrences.all()[0]
-        sdate2 = byebye_occ2.start
-        byebye_occ2.generator = None
-        byebye_occ2.save()
-        self.weekly_generator = self.weekly_generator.reload()
-        self.ae(self.weekly_generator.exceptions.keys(), [sdate.isoformat(), sdate2.isoformat()])
-
-        #now try with event reassignment (which should NOT affect exceptions)
-        byebye_occ3 = self.weekly_generator.occurrences.all()[0]
-        bb3_id = byebye_occ3.id
-        sdate3 = byebye_occ3.start
-        byebye_occ3.event = self.furniture_collection
-        byebye_occ3.save()
-        #check it DOESN'T get added to exceptions
-        self.weekly_generator = self.weekly_generator.reload()
-        self.ae(self.weekly_generator.exceptions.keys(), [sdate.isoformat(), sdate2.isoformat()])
-        
-        #but also that it doesn't get regenerated.
-        self.weekly_generator.generate()
-        bb3 = ExampleGOccurrence.objects.get(id=bb3_id)
-        self.assertTrue(bb3 in self.weekly_generator.occurrences.all())
-        self.ae(bb3.event, self.furniture_collection)
-    
-    def _reset_generator_changes(self):
-        self.bin_night.occurrences.all().delete()
-        self.changeable_generator = self.bin_night.generators.create(
-            event_start=datetime(2010, 10, 1, 8, 30),
-            event_end=datetime(2010, 10, 1, 9, 30),
-            rule=self.weekly,
-            repeat_until=datetime(2010, 10, 8)
+            event_end=dt1,
+            rule=self.yearly
         )
-        #freak occurrence
-        self.occ3 = self.changeable_generator.create_occurrence(start=datetime(2010, 10, 1, 13, 30), end=datetime(2010, 10, 1, 15, 30))
+        self.assertRaises(
+            AttributeError,
+            e.generators.create,
+            event_start=d2, event_end=dt1, rule=self.yearly
+        )
+        self.assertRaises(AttributeError,
+            e.generators.create, event_start=d2, event_end=d1, rule=self.yearly
+        )
 
-        self.ae(self.changeable_generator.occurrences.count(), 3)
-        self.ae(self.changeable_generator.exceptions, {})
-        self.original_occurrences = list(self.changeable_generator.occurrences.all())
-        self.occ1 = self.original_occurrences[0] #freak one is [1]
-        self.occ2 = self.original_occurrences[2]
-        self.normal_occurrences = [self.occ1, self.occ2]
-
-    def test_changes(self):
+        # user error: making an event that lasts longer than a day repeat daily
+        self.assertRaises(AttributeError,
+            e.generators.create, event_start=dt1, event_end=dt2, rule=self.daily
+        )
+    
+    def test_clash(self):
         """
-        When you change a generator and save it, it updates existing occurrences according to the following:
-        
-        * If a repetition rule was changed:
-            don't try to update occurrences, but run generate() to make the new occurrences.
-        * If a repeat_until rule was changed:
-            don't try to delete out-of-bounds occurrences, but run generate() to make the new occurrences.
-            out-of-bounds occurrences are left behind.
-            ie do nothing special :-)
-            
-        * If start date (or datetime) was changed:
-            run the old rule, and timeshift all occurrences produced by the old rule.
-
-        * Else if only start time was changed:
-            update all the generator's occurrences that have the same start time.
-            
-        * If end date or (or datetime) was changed:
-            run the (new) generator and update the end date of all occurrences produced by the rule
-        
-        * If only end time was changed:
-            update all the generator's occurrences that have the same end time.
+        weekly_generator and endless_generator are set up to generate clashing
+        occurrences. They shouldn't.
         """
+        wo = set(self.weekly_generator.occurrences.all())
+        eo = set(self.endless_generator.occurrences.all())
         
+        # there should be no intersection of occurrences
+        self.assertTrue(wo.isdisjoint(eo))
+    
+    def _reset_generator_fixture(self):
+        """ In this test, changeable_generator initially generates events weekly
+        from 27 December 2010 from 8.30-9.30am, until 2 Feb 2011 (before
+        changes, the last occurrence is on 31st Jan 2011). """
+
+        self.furniture_collection, created = ExampleEvent.eventobjects.get_or_create(title='Furniture Collection', slug="furniture-collection")
+        self.furniture_collection.occurrences.all().delete()
+        self.furniture_collection.generators.all().delete()
+        self.changeable_generator = self.furniture_collection.generators.create(
+            event_start=datetime(2010, 12, 27, 8, 30),
+            event_end=datetime(2010, 12, 27, 9, 30),
+            rule=self.weekly,
+            repeat_until=datetime(2011, 2, 2, 23, 59, 59)
+        )
+
+        # assert count
+        self.ae(self.changeable_generator.occurrences.count(), 6)
+        self.original_generated_occurrences = \
+            list(self.changeable_generator.occurrences.all())
+        self.original_generated_occurrence_ids = \
+                set([x.id for x in self.original_generated_occurrences])
+
+        # assert initial duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
+            for x in self.original_generated_occurrences]
+        # assert initial day of the week
+        [self.ae(x.start.weekday(), 0) \
+            for x in self.original_generated_occurrences]
+        [self.ae(x.end.weekday(), 0) \
+            for x in self.original_generated_occurrences]
                 
-        # let's change the timing and rule. The existing occurrences should be untouched.
-        self._reset_generator_changes()
-        daily = Rule.objects.create(frequency = "DAILY")
-        self.changeable_generator.event_start=datetime(2010, 9, 30, 10, 30)
-        self.changeable_generator.rule=daily
-        self.changeable_generator.save()    
-        new_occurrences = list(self.changeable_generator.occurrences.all())
-        self.ae(len(new_occurrences), 12)
-        for occ in self.normal_occurrences: #forget the freak one
-            self.assertTrue(occ in new_occurrences)
-            o = self.changeable_generator.occurrences.get(id=occ.id)
-            self.ae(o.start.time(), time(8,30))
-            self.ae(o.end.time(), time(9,30))
+                
+    def test_start_changes(self):     
+        """
+        test the effects of changing event start date/time.
         
-        # let's change the repeat_until rule to earlier. Nothing should be deleted.
-        self._reset_generator_changes()
-        self.changeable_generator.repeat_until = date(2010, 10, 1)
+        (If start date is changed, we'll end up with 'orphan' occurrences.)
+        """
+    
+        # =================================
+        # changing start time later to 0900
+        # =================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date(),
+                time(9,00)
+            )
         self.changeable_generator.save()
-        new_occurrences = list(self.changeable_generator.occurrences.all())
-        self.ae(len(new_occurrences), 3)
-        for occ in self.original_occurrences:
-            self.assertTrue(occ in new_occurrences)
         
-        #let's change the start date/time
-        self._reset_generator_changes()
-        self.changeable_generator.event_start = datetime(2010, 9, 30, 8, 45)
-        self.changeable_generator.save()
-        #reload the original occurrences. The times should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.start, datetime(2010, 9, 30, 8, 45))
-        self.ae(occ2.start, datetime(2010, 10, 7, 8, 45))
-        #freak occurrence is unaffected
-        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration
+        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 0) \
+            for x in new_occurrences]
 
-        #let's change the start time only, first tweaking an occurrence date.
-        self._reset_generator_changes()
-        #change occurrence date (not time) - we expect the time to be updated by the generator change.
-        self.occ1.start = datetime(2010, 9, 30, 8, 30)
-        self.occ1.save()
-        #change generator time (not date)
-        self.changeable_generator.event_start = datetime(2010, 10, 1, 8, 45)
+        # ===================================
+        # changing start time earlier to 0800
+        # ===================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date(),
+                time(8,00)
+            )
         self.changeable_generator.save()
-        #reload the original occurrences. The times should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.start, datetime(2010, 9, 30, 8, 45))
-        self.ae(occ2.start, datetime(2010, 10, 8, 8, 45))
-        #freak occurrence is unaffected
-        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
-
-        #let's change the end date/time
-        self._reset_generator_changes()
-        self.changeable_generator.event_end = datetime(2010, 10, 2, 9, 45)
-        self.changeable_generator.save()
-        #reload the original occurrences. The endtimes should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.end, datetime(2010, 10, 2, 9, 45))
-        self.ae(occ2.end, datetime(2010, 10, 9, 9, 45))
-        #freak occurrence is unaffected
-        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
         
-        #let's change the end time only, first tweaking an occurrence date.
-        self._reset_generator_changes()
-        #change occurrence date (not time)
-        self.occ1.end = datetime(2010, 10, 3, 9, 30)
-        self.occ1.save()
-        #change generator time (not date)
-        self.changeable_generator.event_end = datetime(2010, 10, 1, 9, 45)
-        self.changeable_generator.save()
-        #reload the original occurrences. The times should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.end, datetime(2010, 10, 3, 9, 45))
-        self.ae(occ2.end, datetime(2010, 10, 8, 9, 45))
-        #freak occurrence is unaffected
-        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
+        # assert new duration
+        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 0) \
+            for x in new_occurrences]
 
-        # if we change the rule so that times are shifted to match other occurrences then
-        # all occurrences are kept.
-        self._reset_generator_changes()
-        self.changeable_generator.event_start = self.occ3.start
-        self.changeable_generator.event_end = self.occ3.end
+        # =============================================================
+        # changing start time nearly 24h earlier to 0900 the day before 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() - timedelta(1),
+                time(9,00)
+            )
         self.changeable_generator.save()
-        self.ae(self.changeable_generator.occurrences.count(), 3)
-        #reload the original occurrences. The times should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.start, datetime(2010, 10, 1, 13, 30))
-        self.ae(occ2.start, datetime(2010, 10, 8, 13, 30))
-        self.ae(occ3.start, datetime(2010, 10, 1, 13, 30))
-        self.ae(occ1.end, datetime(2010, 10, 1, 15, 30))
-        self.ae(occ2.end, datetime(2010, 10, 8, 15, 30))
-        self.ae(occ3.end, datetime(2010, 10, 1, 15, 30))
-        self.assertTrue(occ3.id != occ1.id)
         
-        #now updates should affect occ3 as well
-        self.changeable_generator.event_start = datetime(2010, 9, 30, 13, 31)
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration (24.5h)
+        [self.ae(x.duration, timedelta(days=1, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 6) \
+            for x in new_occurrences]
+  
+        # =============================================================
+        # changing start time more than 24h earlier to 0800 the day before 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() - timedelta(1),
+                time(8,00)
+            )
         self.changeable_generator.save()
-        #reload the original occurrences. The times should be updated.
-        occ1 = self.changeable_generator.occurrences.get(id=self.occ1.id)
-        occ2 = self.changeable_generator.occurrences.get(id=self.occ2.id)
-        occ3 = self.changeable_generator.occurrences.get(id=self.occ3.id)
-        self.ae(occ1.start, datetime(2010, 9, 30, 13, 31))
-        self.ae(occ2.start, datetime(2010, 10, 7, 13, 31))
-        self.ae(occ3.start, datetime(2010, 9, 30, 13, 31))
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
+        # assert new duration (25.5h)
+        [self.ae(x.duration, timedelta(days=1, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 6) \
+            for x in new_occurrences]
+    
+        # =============================================================
+        # changing start time more than 48h earlier to 0800 2 days before 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() - timedelta(2),
+                time(8,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
+        # assert new duration (25.5h)
+        [self.ae(x.duration, timedelta(days=2, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 5) \
+            for x in new_occurrences]
+
+        # =============================================================
+        # changing start time nearly 24h later, to 0800 the day after
+        # (end time is also updated for integrity) 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() + timedelta(1),
+                time(8,00)
+            )
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() + timedelta(1),
+                time(9,30)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        all_ids = set(
+            [x.id for x in self.changeable_generator.event.occurrences.all()]
+        )
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+
+        # assert new times
+        [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
+        # assert new duration (23.5h)
+        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 1) \
+            for x in new_occurrences]
+  
+        # =============================================================
+        # changing start time more than 24h later to 0900 the day after 
+        # (end time is also updated for integrity) 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() + timedelta(1),
+                time(9,00)
+            )
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() + timedelta(1),
+                time(9,30)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        all_ids = set(
+            [x.id for x in self.changeable_generator.event.occurrences.all()]
+        )
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+
+        # assert new times
+        [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration (23.5h)
+        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 1) \
+            for x in new_occurrences]
+    
+        # =============================================================
+        # changing start time more than 48h later to 0900 2 days after 
+        # (end time is also updated for integrity) 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() + timedelta(2),
+                time(9,00)
+            )
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() + timedelta(2),
+                time(9,30)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        all_ids = set(
+            [x.id for x in self.changeable_generator.event.occurrences.all()]
+        )
+
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration (23.5h)
+        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.start.weekday(), 2) \
+            for x in new_occurrences]
+
+    def test_end_changes(self):     
+        """
+        test the effects of changing end date/time.
+        
+        (If only end datetime is changed, we'll never end up with 'orphan' 
+        occurrences.)
+        """
+    
+        # =================================
+        # changing end time later to 1000
+        # =================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date(),
+                time(10,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
+        # assert new duration
+        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 0) \
+            for x in new_occurrences]
+    
+        # ===================================
+        # changing end time earlier to 0900
+        # ===================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date(),
+                time(9,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration
+        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 0) \
+            for x in new_occurrences]
+    
+        # =============================================================
+        # changing end time nearly 24h later to 0900 the day after 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() + timedelta(1),
+                time(9,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration (24.5h)
+        [self.ae(x.duration, timedelta(days=1, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 1) \
+            for x in new_occurrences]
+      
+        # =============================================================
+        # changing end time more than 24h later to 1000 the day after 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() + timedelta(1),
+                time(10,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+        # assert new times
+        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
+        # assert new duration (25.5h)
+        [self.ae(x.duration, timedelta(days=1, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 1) \
+            for x in new_occurrences]
+    
+        # =============================================================
+        # changing end time nearly 24h earlier, to 1000 the day before
+        # (start time is also updated for integrity) 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() - timedelta(1),
+                time(8,30)
+            )
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() - timedelta(1),
+                time(10,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+    
+        # assert new times
+        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
+        # assert new duration (1.5h)
+        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 6) \
+            for x in new_occurrences]
+      
+        # =============================================================
+        # changing end time more than 24h earlier to 0900 the day before 
+        # (start time is also updated for integrity) 
+        # =============================================================
+        self._reset_generator_fixture()
+            
+        self.changeable_generator.event_start = \
+            datetime.combine(
+                self.changeable_generator.event_start.date() - timedelta(1),
+                time(8,30)
+            )
+        self.changeable_generator.event_end = \
+            datetime.combine(
+                self.changeable_generator.event_end.date() - timedelta(1),
+                time(9,00)
+            )
+        self.changeable_generator.save()
+        
+        new_occurrences = self.changeable_generator.occurrences.all()
+        new_ids = set([x.id for x in new_occurrences])
+        # assert ids haven't changed
+        self.ae(new_ids, self.original_generated_occurrence_ids)
+    
+        # assert new times
+        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
+        # assert new duration (0.5h)
+        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+            for x in new_occurrences]
+        # assert new day of the week
+        [self.ae(x.end.weekday(), 6) \
+            for x in new_occurrences]    
+
+
+        # updating a generator should update other generators, in case their times clashed.
+    def test_clashing_generators(self):
+        """
+        If two generators clash, and one is changed so that it doesn't clash,
+        then the other should create occurrences.
+        
+        # in the fixture, these two generators are identical
+        obj.weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+        obj.dupe_weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
 
         """
-        TODO: We need a special admin widget for entering the datetimes.
-        """
+        
+        weekly_count = self.weekly_generator.occurrences.count()
+        dupe_weekly_count = self.dupe_weekly_generator.occurrences.count()
+        
+        
+        self.assertTrue(weekly_count > 0)
+        self.assertTrue(dupe_weekly_count == 0)
+
+        #Shift the weekly start forward 30 mins.
+        self.weekly_generator.event_start = datetime(2010,1,8,11,00)
+        self.weekly_generator.save()
+        #should no longer clash
+        self.ae(self.weekly_generator.occurrences.count(), weekly_count)
+        self.ae(self.dupe_weekly_generator.occurrences.count(), weekly_count)
+        
+        
+        

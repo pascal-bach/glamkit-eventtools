@@ -41,12 +41,14 @@ class TestTestEvents(AppTestCase):
         self.ae(o.start.time(), time.min)
         self.ae(o.end.date(), date.today())
         self.ae(o.end.time(), time.max)
-        
+        o.delete()
+       
         #and this way:
         o = ExampleOccurrence.objects.create(event=e, start=date.today())
         self.ae(o.start.time(), time.min)
         self.ae(o.end.date(), date.today())
         self.ae(o.end.time(), time.max)
+        o.delete()
 
     def test_occurrence_relation(self):
         """
@@ -168,42 +170,25 @@ class TestTestEvents(AppTestCase):
     #     # in next year. Only 7 * 5 event
     #     self.ae(week.count(), 35)        
 
-    def test_open_close(self):
+    def test_qs_occurrences(self):
         """
         You can query ExampleEvent to find only those events that are opening or closing.
         
         A closing event is defined as the last occurrence start (NOT the last occurrence end, which would be less intuitive for users)
         
-        TODO: in trees of events, what are the opening and closing occurrences?
-        It should be that only occurrences that are the earliest/latest in their direct family are opening/closing.
-        For now every event in the tree can have opens and closes.
+        In trees of events, the latest/earliest in an occurrence's children are
+        the opening/closing event.
         
         """
         
-        o = ExampleEvent.eventobjects.opening_before(self.day1)
-        self.ae(set(o), set([self.talk, self.performance, self.daily_tour, self.weekly_talk, self.film]))
-        o = ExampleEvent.eventobjects.opening_after(self.day1)
-        self.ae(
-            set(o),
-            set([self.talk, self.performance, self.film, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn])
-        )
-        o = ExampleEvent.eventobjects.opening_between(self.day1, self.day2)
-        self.ae(set(o), set([self.talk, self.performance, self.film, self.film_with_popcorn]))
-        o = ExampleEvent.eventobjects.opening_on(self.day1)
-        self.ae(set(o), set([self.talk, self.performance, self.film]))
-        o = ExampleEvent.eventobjects.opening_on(self.day2)
-        self.ae(set(o), set([self.film_with_popcorn]))
-        
-        c = ExampleEvent.eventobjects.closing_before(self.day2)
-        self.ae(set(c), set([self.talk, self.daily_tour, self.film, self.film_with_popcorn]))
-        c = ExampleEvent.eventobjects.closing_after(self.day2)
-        self.ae(set(c), set([self.talk, self.performance, self.weekly_talk, self.film_with_popcorn, self.film_with_talk, self.film_with_talk_and_popcorn]))
-        c = ExampleEvent.eventobjects.closing_between(self.day1, self.day2)
-        self.ae(set(c), set([self.talk, self.film, self.film_with_popcorn]))
-        c = ExampleEvent.eventobjects.closing_on(self.day2)
-        self.ae(set(c), set([self.talk, self.film_with_popcorn]))
-        c = ExampleEvent.eventobjects.closing_on(self.day1)
-        self.ae(set(c), set([self.film]))
+        o = ExampleEvent.eventobjects.opening_occurrences()
+        o2 = [a.opening_occurrence() for a in ExampleEvent.eventobjects.all()]
+        self.ae(set(o), set(o2))
+
+        o = ExampleEvent.eventobjects.closing_occurrences()
+        o2 = [a.closing_occurrence() for a in ExampleEvent.eventobjects.all()]
+        self.ae(set(o), set(o2))
+
         
     def test_GET(self):
         """        
@@ -225,26 +210,26 @@ class TestTestEvents(AppTestCase):
         self.ae(self.film.get_descendant_count(), 3)
         self.ae(list(self.film.get_descendants(include_self=True)), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn])
 
-        self.film.name = "Irish fillum night"
+        self.film.title = "Irish fillum night"
         self.film.save()
 
         # reload everything
         reload_films(self)
+                
+        self.ae(self.film_with_talk.title, "Irish fillum night")
+        self.ae(self.film_with_talk_and_popcorn.title, "Irish fillum night")
+        self.ae(self.film_with_popcorn.title, "Irish fillum night")
         
-        self.ae(self.film_with_talk.name, "Irish fillum night")
-        self.ae(self.film_with_talk_and_popcorn.name, "Irish fillum night")
-        self.ae(self.film_with_popcorn.name, "Irish fillum night")
-        
-        self.film_with_talk.name = "Ireland's best films (with free talk)"
+        self.film_with_talk.title = "Ireland's best films (with free talk)"
         self.film_with_talk.save()
         # reload everything
         reload_films(self)
         
-        self.ae(self.film.name, "Irish fillum night")
-        self.ae(self.film_with_talk_and_popcorn.name, "Ireland's best films (with free talk)")
+        self.ae(self.film.title, "Irish fillum night")
+        self.ae(self.film_with_talk_and_popcorn.title, "Ireland's best films (with free talk)")
         
         #put it all back
-        self.film.name = self.film_with_talk.name = "Film Night"
+        self.film.title = self.film_with_talk.title = "Film Night"
         self.film.save()
         self.film_with_talk.save()
         
@@ -262,16 +247,16 @@ class TestTestEvents(AppTestCase):
     #     
     #     #object instantiation
     #     self.new_film = ExampleEvent(parent=self.film)
-    #     self.ae(self.new_film.name, self.film.name)
+    #     self.ae(self.new_film.title, self.film.title)
     #     self.ae(self.new_film.slug, 'the-slug')        
     # 
     #     #creation (saving)
     #     self.new_film = ExampleEvent.eventobjects.create(parent=self.film)
-    #     self.ae(self.new_film.name, self.film.name)
+    #     self.ae(self.new_film.title, self.film.title)
     # 
     #     #get_or_create
     #     self.next_new_film, created = ExampleEvent.eventobjects.get_or_create(parent=self.film, slug="new-slug")
-    #     self.ae(self.next_new_film.name, self.film.name)
+    #     self.ae(self.next_new_film.title, self.film.title)
     #     self.ae(self.next_new_film.slug, 'new-slug')        
 
     def test_tree_queries(self):
@@ -305,10 +290,10 @@ class TestTestEvents(AppTestCase):
         (This should go into mptt some day)
         """
         
-        self.has_no_occurrences = ExampleEvent.eventobjects.create(name="no occurrences")
-        self.has_some_occurrences = ExampleEvent.eventobjects.create(parent=self.has_no_occurrences, name="some occurrences")
+        self.has_no_occurrences = ExampleEvent.eventobjects.create(title="no occurrences", slug="no-occurrences")
+        self.has_some_occurrences = ExampleEvent.eventobjects.create(parent=self.has_no_occurrences, title="some occurrences", slug="some-occurrences")
         self.has_some_occurrences.occurrences.create(start=date.today())
-        self.has_some_more_occurrences = ExampleEvent.eventobjects.create(parent=self.has_some_occurrences, name="more occurrences")
+        self.has_some_more_occurrences = ExampleEvent.eventobjects.create(parent=self.has_some_occurrences, title="more occurrences", slug="more-occurrences")
         self.has_some_more_occurrences.occurrences.create(start=date.today())
         
         #reload!
@@ -319,18 +304,18 @@ class TestTestEvents(AppTestCase):
         tree = self.has_no_occurrences.get_descendants(include_self=True)
         
         #fundamentals
-        wch = tree.with_children_having(name__contains="occurrences")
-        wdh = tree.with_descendants_having(name__contains="occurrences")
+        wch = tree.with_children_having(title__contains="occurrences")
+        wdh = tree.with_descendants_having(title__contains="occurrences")
         #include self applies to the query for 'descendants'
-        wdh2 = tree.with_descendants_having(name__contains="occurrences", include_self=False)
-        wph = tree.with_parent_having(name__contains="no")
-        wah = tree.with_ancestors_having(name__contains="no")
+        wdh2 = tree.with_descendants_having(title__contains="occurrences", include_self=False)
+        wph = tree.with_parent_having(title__contains="no")
+        wah = tree.with_ancestors_having(title__contains="no")
         
-        woch = tree.without_children_having(name__contains="more")
-        wodh = tree.without_descendants_having(name__contains="some")
-        wodh2 = tree.without_descendants_having(name__contains="some", include_self=False)
-        woph = tree.without_parent_having(name__contains="some")
-        woah = tree.without_ancestors_having(name__contains="some")
+        woch = tree.without_children_having(title__contains="more")
+        wodh = tree.without_descendants_having(title__contains="some")
+        wodh2 = tree.without_descendants_having(title__contains="some", include_self=False)
+        woph = tree.without_parent_having(title__contains="some")
+        woah = tree.without_ancestors_having(title__contains="some")
 
         self.assertEqual(list(wch), [self.has_no_occurrences, self.has_some_occurrences])
         self.assertEqual(list(wdh), [self.has_no_occurrences, self.has_some_occurrences, self.has_some_more_occurrences])
@@ -380,25 +365,19 @@ class TestTestEvents(AppTestCase):
         """
         
         #descendants (this is an mptt function)
-        self.ae(list(self.film.get_descendants()), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn])
-        self.ae(list(self.film_with_talk.get_descendants()), [self.film_with_talk, self.film_with_talk_and_popcorn])
-        self.ae(list(self.film_with_talk.get_descendants(include_self=False)), [self.film_with_talk_and_popcorn])
+        self.ae(list(self.film.get_descendants()), [self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn])
+        self.ae(list(self.film_with_talk.get_descendants()), [self.film_with_talk_and_popcorn])
+        self.ae(list(self.film_with_talk.get_descendants(include_self=True)), [self.film_with_talk, self.film_with_talk_and_popcorn])
         
-        #family (descendants + ancestors)
-        self.ae(list(self.film_with_talk.get_family()), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn])
-        self.ae(list(self.film_with_talk.get_family(include_self=False)), [self.film, self.film_with_talk_and_popcorn])
-
-        # occurrence versions
-        self.ae(list(self.film.get_descendants().occurrences()), [self.film_occ, self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        # occurrence equivalents
+        self.ae(list(self.film.get_descendants(include_self=True).occurrences()), [self.film_occ, self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
         self.ae(list(self.film.get_descendants(include_self=False).occurrences()), [self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
-        self.ae(list(self.film.get_family().occurrences()), [self.film_occ, self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
-        self.ae(list(self.film.get_family(include_self=False).occurrences()), [self.film_with_popcorn_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
-
-        self.ae(list(self.film_with_talk.get_descendants().occurrences()), [self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
+        self.ae(list(self.film_with_talk.get_descendants(include_self=True).occurrences()), [self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
         self.ae(list(self.film_with_talk.get_descendants(include_self=False).occurrences()), [self.film_with_talk_and_popcorn_occ])
-        self.ae(list(self.film_with_talk.get_family().occurrences()), [self.film_occ, self.film_with_talk_occ, self.film_with_talk_and_popcorn_occ])
-        self.ae(list(self.film_with_talk.get_family(include_self=False).occurrences()), [self.film_occ, self.film_with_talk_and_popcorn_occ])
         
+        #proxies
+        self.ae(list(self.film.get_descendants(include_self=True).occurrences()), list(self.film.complete_occurrences()))
+        self.ae(list(self.film_with_talk.get_descendants(include_self=True).occurrences()), list(self.film_with_talk.complete_occurrences()))
 
     def test_diffs(self):
         self.ae(unicode(self.film), u'Film Night')

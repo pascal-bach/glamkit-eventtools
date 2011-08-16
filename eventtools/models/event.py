@@ -17,11 +17,37 @@ from eventtools.utils.dateranges import DateTester
 from eventtools.utils.domain import django_root_url
 
 class EventQuerySet(models.query.QuerySet):
-    #much as you may be tempted to add "storts_between" and other OccurrenceQuerySet methods, resist (for the sake of DRYness and performance). Instead, use OccurrenceQuerySet.starts_between().events().
-    def occurrences(self, *args, **kwargs):
-        return self.model.OccurrenceModel().objects.filter(event__in=self).filter(*args, **kwargs)
+    # much as you may be tempted to add "starts_between" and other
+    # OccurrenceQuerySet methods, resist (for the sake of DRYness and some
+    # performance). Instead, use OccurrenceQuerySet.starts_between().events().
+    # We have to relax this for opening and closing occurrences, as they're 
+    # relevant to a particular event.
     
+    def occurrences(self, *args, **kwargs):
+        """
+        Returns the occurrences for events in this queryset. NB that only
+        occurrences attached directly to events, ie not child events, are returned.
+        """
+        return self.model.OccurrenceModel().objects.filter(event__in=self).filter(*args, **kwargs)
+        
+    def complete_occurrences(self, *args, **kwargs):
+        """
+        Returns the occurrences for events in this queryset and their children.
+        """
+        event_ids = []
+        for e in self:
+            for c in e.get_descendants(include_self=True):
+                event_ids.append(c.id)
+        
+        return self.model.OccurrenceModel().objects.filter(event__in=event_ids).filter(*args, **kwargs)
+        
     def opening_occurrences(self):
+        """
+        Returns the opening occurrences for the events in this queryset.
+        
+        Since it uses Event.opening_occurrence(), the default behaviour is to look
+        at the complete_occurrences (ie, occurrences of children are included).        
+        """
         pks = []
         for e in self:
             try:
@@ -30,16 +56,13 @@ class EventQuerySet(models.query.QuerySet):
                 pass
         return self.occurrences(pk__in=pks)
         
-    def opening_before(self, date):
-        return self.opening_occurrences().before(date).events()
-    def opening_after(self, date):
-        return self.opening_occurrences().after(date).events()
-    def opening_between(self, d1, d2):
-        return self.opening_occurrences().between(d1, d2).events()
-    def opening_on(self, date):
-        return self.opening_occurrences().on(date).events()
-
     def closing_occurrences(self):
+        """
+        Returns the closing occurrences for the events in this queryset.
+        
+        Since it uses Event.opening_occurrence(), the behaviour is to look
+        at the complete_occurrences (ie, occurrences of children are included).
+        """
         pks = []
         for e in self:
             try:
@@ -48,15 +71,6 @@ class EventQuerySet(models.query.QuerySet):
                 pass
         return self.occurrences(pk__in=pks)
         
-    def closing_before(self, date):
-        return self.closing_occurrences().before(date).events()
-    def closing_after(self, date):
-        return self.closing_occurrences().after(date).events()
-    def closing_between(self, d1, d2):
-        return self.closing_occurrences().between(d1, d2).events()
-    def closing_on(self, date):
-        return self.closing_occurrences().on(date).events()
-
     def _with_relatives_having(self, relatives_fn, *args, **kwargs):
         """
         Return the set of items in self that have relatives matching a particular criteria.
@@ -144,23 +158,14 @@ class EventTreeManager(TreeManager):
         
     def occurrences(self, *args, **kwargs):
         return self.get_query_set().occurrences(*args, **kwargs)
+    def complete_occurrences(self, *args, **kwargs):
+        return self.get_query_set().complete_occurrences(*args, **kwargs)
+    def opening_occurrences(self, *args, **kwargs):
+        return self.get_query_set().opening_occurrences(*args, **kwargs)
+    def closing_occurrences(self, *args, **kwargs):
+        return self.get_query_set().closing_occurrences(*args, **kwargs)
 
-    def opening_before(self, *args, **kwargs):
-        return self.get_query_set().opening_before(*args, **kwargs)
-    def opening_after(self, *args, **kwargs):
-        return self.get_query_set().opening_after(*args, **kwargs)
-    def opening_between(self, *args, **kwargs):
-        return self.get_query_set().opening_between(*args, **kwargs)
-    def opening_on(self, *args, **kwargs):
-        return self.get_query_set().opening_on(*args, **kwargs)
-    def closing_before(self, *args, **kwargs):
-        return self.get_query_set().closing_before(*args, **kwargs)
-    def closing_after(self, *args, **kwargs):
-        return self.get_query_set().closing_after(*args, **kwargs)
-    def closing_between(self, *args, **kwargs):
-        return self.get_query_set().closing_between(*args, **kwargs)
-    def closing_on(self, *args, **kwargs):
-        return self.get_query_set().closing_on(*args, **kwargs)        
+ 
     def with_children_having(self, *args, **kwargs):
         return self.get_query_set().with_children_having(*args, **kwargs)        
     def with_descendants_having(self, *args, **kwargs):
@@ -284,31 +289,49 @@ class EventModel(MPTTModel):
     def __unicode__(self):
         return self.title
 
-    def update_endless_generators(self):
-        if hasattr(self, 'generators'):
-            endless_generators = self.generators.filter(rule__isnull=False, repeat_until__isnull=True)
-            [g.generate() for g in endless_generators]
-    
-    def save(self, *args, **kwargs):
-        self.cascade_changes_to_children()
-        self.update_endless_generators()
-        return super(EventModel, self).save(*args, **kwargs)
-                
     @classmethod
     def OccurrenceModel(cls):
+        """
+        Returns the class used for occurrences
+        """
         return cls.occurrences.related.model
 
     @classmethod
     def GeneratorModel(cls):
+        """
+        Returns the class used for generators
+        """
         return cls.generators.related.model
         
+    @classmethod
+    def ExclusionModel(cls):
+        """
+        Returns the class used for exclusions
+        """
+        return cls.exclusions.related.model
+
+    def save(self, *args, **kwargs):
+        """
+        When an event is saved, the changes to fields are cascaded to children,
+        and any endless generators are updated, so that a few more occurrences
+        are generated
+        """
+        self._cascade_changes_to_children() #this has to happen before super.save, so that we can tell what's changed
+        r = super(EventModel, self).save(*args, **kwargs)
+
+        endless_generators = self.generators.filter(repeat_until__isnull=True)
+        [g.save() for g in endless_generators]
+
+        return r
+                
     def reload(self):
         """
-        Call with x = x.reload() - it doesn't change itself
+        Used for refreshing events in a queryset that may have changed.        
+        Call with x = x.reload() - it doesn't change self.
         """
         return type(self)._event_manager.get(pk=self.pk)
         
-    def cascade_changes_to_children(self):
+    def _cascade_changes_to_children(self):
         if self.pk:
             saved_self = type(self)._event_manager.get(pk=self.pk)
             attribs = type(self)._event_meta.fields_to_inherit
@@ -324,19 +347,7 @@ class EventModel(MPTTModel):
                     except AttributeError:
                         continue
                 child.save() #cascades to grandchildren
-                        
-    def opening_occurrence(self):
-        try:
-            return self.complete_occurrences().all()[0]
-        except IndexError:
-            return None
-        
-    def closing_occurrence(self):
-        try:
-            return self.complete_occurrences().all().reverse()[0]
-        except IndexError:
-            return None
-
+    
     def complete_occurrences(self):
         return self.get_descendants(include_self=True).occurrences()
 
@@ -344,46 +355,41 @@ class EventModel(MPTTModel):
         """needed by admin"""
         return self.complete_occurrences().count()
         
-    def get_family(self, include_self=True):
-        #have to call super, because the clone buggers up the filter...
-        familyqs = super(EventModel, self).get_ancestors() | super(EventModel, self).get_descendants(include_self=include_self)
-        return familyqs
+    def direct_opening_occurrence(self):
+        try:
+            return self.occurrences.all()[0]
+        except IndexError:
+            return None
         
-    def highest_ancestor_having_occurrences(self, include_self=True, test=False):
-        ancestors = self.get_ancestors()
-        if ancestors:
-            ancestors_with_occurrences = ancestors.having_occurrences()
-            if ancestors_with_occurrences:
-                return ancestors_with_occurrences[0]
-        if include_self and self.complete_occurrences().count():
-            return self
-        return None
+    def direct_closing_occurrence(self):
+        try:
+            return self.occurrences.all().reverse()[0]
+        except IndexError:
+            return None
+
+    def complete_opening_occurrence(self):
+        try:
+            return self.complete_occurrences().all()[0]
+        except IndexError:
+            return None
         
+    def complete_closing_occurrence(self):
+        try:
+            return self.complete_occurrences().all().reverse()[0]
+        except IndexError:
+            return None
+            
+    opening_occurrence = complete_opening_occurrence
+    closing_occurrence = complete_closing_occurrence
+
+
     def get_absolute_url(self):
         return reverse('events:event', kwargs={'event_slug': self.slug })
         
     def has_finished(self):
         """ the event has finished if the closing occurrence has finished. """
         return self.closing_occurrence().has_finished
-                
-    @property
-    def date_tester(self):
-        return DateTester(self.occurrences.all())
-
-    def ics_url(self):
-        """
-        Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
-        an 'ics_for_event' view and url, and properties for populating an ics for each event
-        (see OccurrenceModel.as_icalendar for default properties)
-        """
-        return django_root_url() + reverse("ics_for_event", args=[self.pk])
-
-    def webcal_url(self):
-        return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
-        
-    def gcal_url(self):
-        return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())
-        
+                        
     def season(self):
         """
         Returns a string describing the first and last dates of this event.
@@ -410,3 +416,28 @@ class EventModel(MPTTModel):
 
     def sessions(self):
         return self.sessions_description or self.robot_description()
+
+    def highest_ancestor_having_occurrences(self, include_self=True, test=False):
+        ancestors = self.get_ancestors()
+        if ancestors:
+            ancestors_with_occurrences = ancestors.having_occurrences()
+            if ancestors_with_occurrences:
+                return ancestors_with_occurrences[0]
+        if include_self and self.complete_occurrences().count():
+            return self
+        return None
+        
+    # ical functions coming back soon
+    # def ics_url(self):
+    #     """
+    #     Needs to be fully-qualified (for sending to calendar apps). Your app needs to define
+    #     an 'ics_for_event' view and url, and properties for populating an ics for each event
+    #     (see OccurrenceModel.as_icalendar for default properties)
+    #     """
+    #     return django_root_url() + reverse("ics_for_event", args=[self.pk])
+    # 
+    # def webcal_url(self):
+    #     return self.ics_url().replace("http://", "webcal://").replace("https://", "webcal://")
+    #     
+    # def gcal_url(self):
+    #     return  "http://www.google.com/calendar/render?cid=%s" % urlencode(self.ics_url())

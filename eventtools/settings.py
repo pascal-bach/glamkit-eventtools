@@ -20,5 +20,3 @@ ICAL_CALDESC = "Events listing" #e.g. "Events listing from mysite.com"
 
 from dateutil.relativedelta import relativedelta
 DEFAULT_GENERATOR_LIMIT = relativedelta(years=1) #months=6, etc
-
-ALLOW_CLASHING_OCCURRENCES = True

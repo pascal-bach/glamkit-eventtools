@@ -22,7 +22,7 @@ class TestOccurrences(AppTestCase):
     End datetime must be >= start datetime.
     """
     def test_occurrence_create(self):
-        e = ExampleEvent.eventobjects.create(name="event with occurrences")
+        e = ExampleEvent.eventobjects.create(title="event with occurrences")
         
         d1 = date(2010,1,1)
         d2 = date(2010,1,2)
@@ -39,33 +39,40 @@ class TestOccurrences(AppTestCase):
         o = e.occurrences.create(start=dt1, end=dt2)
         self.ae(o.start, dt1)
         self.ae(o.end, dt2)
+        o.delete()
 
         o = e.occurrences.create(start=dt1)
         self.ae(o.start, dt1)
         self.ae(o.end, dt1)
+        o.delete()
 
         o = e.occurrences.create(start=d1min)
         self.ae(o.start, d1min)
         self.ae(o.end, d1max)
+        o.delete()
 
         
         #dates
         o = e.occurrences.create(start=d1)
         self.ae(o.start, d1min)
         self.ae(o.end, d1max)
+        o.delete()
 
         o = e.occurrences.create(start=d1, end=d2)
         self.ae(o.start, d1min)
         self.ae(o.end, d2max)
+        o.delete()
 
         #combos
         o = e.occurrences.create(start=dt1, end=d2)
         self.ae(o.start, dt1)
         self.ae(o.end, d2max)
+        o.delete()
         
         o = e.occurrences.create(start=d1, end=dt2)
         self.ae(o.start, d1min)
         self.ae(o.end, dt2)
+        o.delete()
         
         #missing start date
         self.assertRaises(TypeError, e.occurrences.create, **{'end':dt1})
@@ -99,7 +106,7 @@ class TestOccurrences(AppTestCase):
         We can find out how long we have to wait until an occurrence starts.
         We can find out how long it has been since an occurrence finished.
         """
-        e = ExampleEvent.eventobjects.create(name="event with occurrences")
+        e = ExampleEvent.eventobjects.create(title="event with occurrences")
         
         now = datetime.now()
         earlier = now - timedelta(seconds=600)

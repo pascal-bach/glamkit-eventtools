@@ -38,6 +38,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
         inlines = [
             OccurrenceInline(EventModel.OccurrenceModel()),
             GeneratorInline(EventModel.GeneratorModel()),
+            ExclusionInline(EventModel.ExclusionModel()),
         ]
 
         def __init__(self, *args, **kwargs):
@@ -153,6 +154,15 @@ def OccurrenceInline(OccurrenceModel):
         }        
     return _OccurrenceInline
 
+def ExclusionInline(ExclusionModel):
+    class _ExclusionInline(admin.TabularInline):
+        model = ExclusionModel
+        extra = 0
+        fields = ('start',)        
+        formfield_overrides = {
+            models.DateTimeField: {'form_class': DateAndMaybeTimeField},
+        }        
+    return _ExclusionInline
 
 def GeneratorInline(GeneratorModel):
     class _GeneratorInline(admin.TabularInline):
