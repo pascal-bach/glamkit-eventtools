@@ -1,0 +1,40 @@
+MODEL
+Is using trees for eventvariations AND parent/child sustainable?
+Maybe some sort of EventTemplate model instead?
+
+Migrate Occurrence and corresponding Generator fields to
+    start_date
+    start_time
+    duration_days
+    duration_minutes
+to reduce cognitive complexity, potential for validationerrors, and 'magic' in
+updating generators.
+
+Change Generator repeat_until to be a date only (since only one occurrence per
+day is generated).
+
+FRONT END
+Prettify templates a bit: Use http://cssgrid.net/ for more flexible layout?
+Tabs for today/tomorrow/this weekend/etc.
+List events only for a specific date (for institutions that have enough events)
+Resurrect iCal.
+
+ADMIN
+Resurrect the view for all occurrences, distinguishing generated or not
+Resurrect the behaviour where deleted generated occurrences are added as an Exception.
+Tooltips for fields in inline admin forms.
+
+UNDER THE HOOD
+Improve performance
+Consistent api for dateranges/pprint_date.
+Put utils.domain into glamkit-convenient, or replace with another technique?
+Patch Django to provide instance to callable for default.
+PEP-8 compliance
+
+DOCUMENTATION
+Docstrings for public methods
+Write up in models.rst
+
+TEST
+Check coverage for public methods
+Add tests for templatetags, views

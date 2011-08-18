@@ -5,7 +5,7 @@ from django.conf import settings
 
 import calendar
 FIRST_DAY_OF_WEEK = calendar.MONDAY #you may prefer Saturday or Sunday.
-FIRST_DAY_OF_WEEKEND = calendar.SATURDAY #you may prefer to add Friday
+FIRST_DAY_OF_WEEKEND = calendar.SATURDAY #you may prefer Friday
 LAST_DAY_OF_WEEKEND = calendar.SUNDAY
 
 EVENT_GET_MAP = {
