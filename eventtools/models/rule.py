@@ -11,8 +11,8 @@ freqs = (
 
 class Rule(models.Model):
     """
-    This defines a rule by which an occurrence will repeat.  This is defined by the
-    rrule in the dateutil documentation.
+    This defines a rule by which an occurrence will repeat. Parameters
+    correspond to the rrule in the dateutil documentation.
 
     * name - the human friendly name of this kind of repetition.
     * frequency - the base repetition period
@@ -37,11 +37,25 @@ class Rule(models.Model):
         ** bysecond
         ** byeaster
     """
-    name = models.CharField(_("name"), max_length=100, help_text=_("a short friendly name for this repetition."))
-    common = models.BooleanField(help_text=_("common rules appear at the top of the list."))
-    frequency = models.CharField(_("frequency"), choices=freqs, max_length=10, blank=True, help_text=_("the base repetition period."))
-    params = models.TextField(_("inclusion parameters"), blank=True, help_text=_("extra params required to define this type of repetition."))
-    complex_rule = models.TextField(_("complex rules"), help_text=_("overrides all other settings."), blank=True)
+    name = models.CharField(
+        _("name"), max_length=100,
+        help_text=_("a short friendly name for this repetition.")
+    )
+    common = models.BooleanField(
+        help_text=_("common rules appear at the top of the list.")
+    )
+    frequency = models.CharField(
+        _("frequency"), choices=freqs, max_length=10, blank=True,
+        help_text=_("the base repetition period.")
+    )
+    params = models.TextField(
+        _("inclusion parameters"), blank=True,
+        help_text=_("extra params required to define this type of repetition.")
+    )
+    complex_rule = models.TextField(
+        _("complex rules"), help_text=_("overrides all other settings."), 
+        blank=True
+    )
 
     class Meta:
         verbose_name = _('repetition rule')

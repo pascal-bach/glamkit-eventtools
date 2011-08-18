@@ -12,7 +12,8 @@ from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
-from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
+from eventtools.utils.pprint_timespan \
+    import pprint_datetime_span, pprint_date_span
 from eventtools.utils.dateranges import DateTester
 from eventtools.utils.domain import django_root_url
 
@@ -28,7 +29,9 @@ class EventQuerySet(models.query.QuerySet):
         Returns the occurrences for events in this queryset. NB that only
         occurrences attached directly to events, ie not child events, are returned.
         """
-        return self.model.OccurrenceModel().objects.filter(event__in=self).filter(*args, **kwargs)
+        return self.model.OccurrenceModel().objects\
+            .filter(event__in=self)\
+            .filter(*args, **kwargs)
         
     def complete_occurrences(self, *args, **kwargs):
         """
@@ -39,14 +42,17 @@ class EventQuerySet(models.query.QuerySet):
             for c in e.get_descendants(include_self=True):
                 event_ids.append(c.id)
         
-        return self.model.OccurrenceModel().objects.filter(event__in=event_ids).filter(*args, **kwargs)
+        return self.model.OccurrenceModel().objects\
+            .filter(event__in=event_ids)\
+            .filter(*args, **kwargs)
         
     def opening_occurrences(self):
         """
         Returns the opening occurrences for the events in this queryset.
         
-        Since it uses Event.opening_occurrence(), the default behaviour is to look
-        at the complete_occurrences (ie, occurrences of children are included).        
+        Since it uses Event.opening_occurrence(), the default behaviour is to
+        look at the complete_occurrences (ie, occurrences of children are
+        included).
         """
         pks = []
         for e in self:
@@ -60,8 +66,8 @@ class EventQuerySet(models.query.QuerySet):
         """
         Returns the closing occurrences for the events in this queryset.
         
-        Since it uses Event.opening_occurrence(), the behaviour is to look
-        at the complete_occurrences (ie, occurrences of children are included).
+        Since it uses Event.opening_occurrence(), the behaviour is to look at
+        the complete_occurrences (ie, occurrences of children are included).
         """
         pks = []
         for e in self:
@@ -73,7 +79,8 @@ class EventQuerySet(models.query.QuerySet):
         
     def _with_relatives_having(self, relatives_fn, *args, **kwargs):
         """
-        Return the set of items in self that have relatives matching a particular criteria.
+        Return the set of items in self that have relatives matching a
+        particular criteria.
         """
         match_ids = set()
         for obj in self:
@@ -84,22 +91,10 @@ class EventQuerySet(models.query.QuerySet):
                     match_ids.add(obj.id)
         return self.filter(id__in=match_ids)
 
-    def with_children_having(self, *args, **kwargs):
-        return self._with_relatives_having(lambda x: x.get_children(), *args, **kwargs)
-        
-    def with_descendants_having(self, *args, **kwargs):
-        include_self = kwargs.pop('include_self', True)
-        return self._with_relatives_having(lambda x: x.get_descendants(include_self=include_self), *args, **kwargs)
-
-    def with_parent_having(self, *args, **kwargs):
-        return self._with_relatives_having(lambda x: self.filter(id=x.parent_id), *args, **kwargs)
-
-    def with_ancestors_having(self, *args, **kwargs):
-        return self._with_relatives_having(lambda x: x.get_ancestors(), *args, **kwargs)
-
     def _without_relatives_having(self, relatives_fn, *args, **kwargs):
         """
-        Return the set of items in self that have 0 relatives matching a particular criteria.
+        Return the set of items in self that have 0 relatives matching a
+        particular criteria.
         """
         match_ids = set()
         for obj in self:
@@ -111,26 +106,60 @@ class EventQuerySet(models.query.QuerySet):
             else: #no relatives => win
                     match_ids.add(obj.id)                
         return self.filter(id__in=match_ids)
+
+    def with_children_having(self, *args, **kwargs):
+        return self._with_relatives_having(
+            lambda x: x.get_children(), *args, **kwargs
+        )
         
+    def with_descendants_having(self, *args, **kwargs):
+        include_self = kwargs.pop('include_self', True)
+        return self._with_relatives_having(
+            lambda x: x.get_descendants(include_self=include_self),
+            *args,
+            **kwargs
+        )
+
+    def with_parent_having(self, *args, **kwargs):
+        return self._with_relatives_having(
+            lambda x: self.filter(id=x.parent_id), *args, **kwargs
+        )
+
+    def with_ancestors_having(self, *args, **kwargs):
+        return self._with_relatives_having(
+            lambda x: x.get_ancestors(), *args, **kwargs
+        )
+
     def without_children_having(self, *args, **kwargs):
-        return self._without_relatives_having(lambda x: x.get_children(), *args, **kwargs)
+        return self._without_relatives_having(
+            lambda x: x.get_children(), *args, **kwargs
+        )
 
     def without_descendants_having(self, *args, **kwargs):
         include_self = kwargs.pop('include_self', True)
-        return self._without_relatives_having(lambda x: x.get_descendants(include_self=include_self), *args, **kwargs)
+        return self._without_relatives_having(
+            lambda x: x.get_descendants(include_self=include_self), 
+            *args, **kwargs
+        )
 
     def without_parent_having(self, *args, **kwargs):
-        return self._without_relatives_having(lambda x: self.filter(id=x.parent_id), *args, **kwargs)
+        return self._without_relatives_having(
+            lambda x: self.filter(id=x.parent_id), *args, **kwargs
+        )
 
     def without_ancestors_having(self, *args, **kwargs):
-        return self._without_relatives_having(lambda x: x.get_ancestors(), *args, **kwargs)
+        return self._without_relatives_having(
+            lambda x: x.get_ancestors(), *args, **kwargs
+        )
         
     #some simple annotations
     def having_occurrences(self):
-        return self.annotate(num_occurrences=Count('occurrences')).filter(num_occurrences__gt=0)
+        return self.annotate(num_occurrences=Count('occurrences'))\
+            .filter(num_occurrences__gt=0)
 
     def having_n_occurrences(self, n):
-        return self.annotate(num_occurrences=Count('occurrences')).filter(num_occurrences=n)
+        return self.annotate(num_occurrences=Count('occurrences'))\
+            .filter(num_occurrences=n)
 
     def having_no_occurrences(self):
         return self.having_n_occurrences(0)
@@ -141,11 +170,14 @@ class EventQuerySet(models.query.QuerySet):
             a) they have occurrences
             b) none of their ancestors have occurrences
         
-        This is a good first blush at 'The List Of Events', since it is the longest list of events whose descendants'
-        occurrences will cover the entire set of occurrences with no repetitions.
+        This is a possible first blush at 'The List Of Events', since it is the
+        longest list of events whose descendants' occurrences will cover the
+        entire set of occurrences with no repetitions.
         """
         return self.having_occurrences()._without_relatives_having(
-            lambda x: x.get_ancestors().annotate(num_occurrences=Count('occurrences')),
+            lambda x: x.get_ancestors().annotate(
+                num_occurrences=Count('occurrences')
+            ),
             num_occurrences__gt=0
         )
 
@@ -193,7 +225,8 @@ class EventTreeManager(TreeManager):
             
 class EventOptions(object):
     """
-    Options class for Event models. Use this as an inner class called EventMeta:
+    Options class for Event models. Use this as an inner class called EventMeta.
+    ie.:
     
     class MyModel(EventModel):
         class EventMeta:
@@ -218,7 +251,8 @@ class EventModelBase(MPTTModelBase):
         Create subclasses of EventModel. This:
          - (via super) adds the MPTT fields to the class
          - adds the EventManager to the model
-         - overrides MPTT's TreeManager to the model
+         - overrides MPTT's TreeManager to the model, so that the treemanager
+           includes eventtools methods.
         """
         event_opts = class_dict.pop('EventMeta', None)
         class_dict['_event_meta'] = EventOptions(event_opts)
@@ -316,7 +350,9 @@ class EventModel(MPTTModel):
         and any endless generators are updated, so that a few more occurrences
         are generated
         """
-        self._cascade_changes_to_children() #this has to happen before super.save, so that we can tell what's changed
+        #this has to happen before super.save, so that we can tell what's
+        #changed
+        self._cascade_changes_to_children()
         r = super(EventModel, self).save(*args, **kwargs)
 
         endless_generators = self.generators.filter(repeat_until__isnull=True)
@@ -341,7 +377,8 @@ class EventModel(MPTTModel):
                     try:
                         saved_value = getattr(saved_self, a)
                         ch_value = getattr(child, a)
-                        if ch_value == saved_value: #the child inherits this value from the parent
+                        if ch_value == saved_value:
+                            #the child's value is unchanged from the parent
                             new_value = getattr(self, a)
                             setattr(child, a, new_value)
                     except AttributeError:

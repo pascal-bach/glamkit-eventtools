@@ -22,7 +22,8 @@ class ExclusionModel(models.Model):
         
     def save(self, *args, **kwargs):
         """
-        When an exclusion is saved, any generated occurrences that match should be unhooked.
+        When an exclusion is saved, any generated occurrences that match should
+        be unhooked.
         """
         r = super(ExclusionModel, self).save(*args, **kwargs)
         
