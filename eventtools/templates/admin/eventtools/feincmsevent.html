@@ -1,5 +1,17 @@
 {% extends "admin/feincms/item_editor.html" %}
 
+{% block feincms_jquery_ui %}
+	{% if FEINCMS_ADMIN_MEDIA_HOTLINKING %}
+		<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css"/>
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.15/jquery-ui.min.js"></script>
+	{% else %}
+		<link rel="stylesheet" type="text/css" href="{{ MEDIA_URL }}css/jquery-ui-lightness/jquery-ui-1.8.15.custom.css" />
+		<script type="text/javascript" src="{{ MEDIA_URL }}js/libs/jquery-1.6.2.min.js"></script>
+		<script type="text/javascript" src="{{ MEDIA_URL }}js/libs/jquery-ui-1.8.15.custom.min.js"></script>
+	{% endif %}
+{% endblock %}
+
 {# django include/ssi tags don't allow block definition. This is exactly identical to the bottom of event.html #}
 {% load i18n %}
 {% load mptt_tags %}

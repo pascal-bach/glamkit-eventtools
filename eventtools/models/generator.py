@@ -273,25 +273,13 @@ class GeneratorModel(models.Model):
             o.generated_by = None
             o.save()
     
-    # This is scrappy
     def robot_description(self):
-        return u'\n'.join(
-            [pprint_datetime_span(start, end) + repeat_description \
-            for start, end, repeat_description in self._spans()])
-    
-    # This is scrappy too (Puppy Power!)
-    def _spans(self):
-        if self.rule:
-            if self.occurrences.count() > 3:
-                if self.repeat_until:
-                    repeat_description = u', repeating %s until %s' % (
-                        self.rule,
-                        pprint_date_span(self.repeat_until, self.repeat_until)
-                    )
-                else:
-                    repeat_description = u', repeating %s' % self.rule
-                return [(self.event_start, self.event_end, repeat_description),]
-            else:
-                return [(occ.start, occ.end, u'') for occ in self.occurrences.all()]
-        else:
-            return [(self.event_start, self.event_end, u''),]
+        r = "%s, repeating %s" % (
+            pprint_datetime_span(self.event_start, self.event_end),
+            unicode(self.rule).lower(),
+        )
+        
+        if self.repeat_until:
+            r += " until %s" % pprint_date_span(self.repeat_until.date(), self.repeat_until.date())
+            
+        return r
