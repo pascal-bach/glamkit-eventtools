@@ -339,13 +339,6 @@ class TestTestEvents(AppTestCase):
         highest_having_occurrences = tree.highest_having_occurrences()
         self.assertEqual(list(highest_having_occurrences), [self.has_some_occurrences])
         
-        #get the highest ancestor of self that has occurrences (if any). This could be a good 'normalisation' process.
-        self.ae(self.has_some_more_occurrences.highest_ancestor_having_occurrences(), self.has_some_occurrences)
-        self.ae(self.has_some_occurrences.highest_ancestor_having_occurrences(), self.has_some_occurrences)
-        self.ae(self.has_some_occurrences.highest_ancestor_having_occurrences(include_self=False), None)
-        self.ae(self.has_no_occurrences.highest_ancestor_having_occurrences(test=True), self.has_no_occurrences)
-        self.ae(self.has_no_occurrences.highest_ancestor_having_occurrences(include_self=False), None)
-
         # self.ae(self.has_some_more_occurrences.highest_descendant_having_occurrences(), self.has_some_occurrences)
         # self.ae(self.has_some_occurrences.highest_descendant_having_occurrences(), self.has_some_occurrences)
         # self.ae(self.has_some_occurrences.highest_descendant_having_occurrences(include_self=False), None)

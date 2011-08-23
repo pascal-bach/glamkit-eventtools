@@ -434,23 +434,18 @@ class EventModel(MPTTModel):
         if self.season_description:
             return self.season_description
         
-        first = self.opening_occurrence().start.date()
-        last = self.closing_occurrence().start.date()
+        o = self.opening_occurrence()
+        c = self.closing_occurrence()
         
-        return pprint_date_span(first, last)
+        if o and c:
+            first = o.start.date()
+            last = c.start.date()
+            return pprint_date_span(first, last)
+            
+        return None
 
     def sessions(self):
         return self.sessions_description
-
-    def highest_ancestor_having_occurrences(self, include_self=True, test=False):
-        ancestors = self.get_ancestors()
-        if ancestors:
-            ancestors_with_occurrences = ancestors.having_occurrences()
-            if ancestors_with_occurrences:
-                return ancestors_with_occurrences[0]
-        if include_self and self.complete_occurrences().count():
-            return self
-        return None
         
     # ical functions coming back soon
     # def ics_url(self):
