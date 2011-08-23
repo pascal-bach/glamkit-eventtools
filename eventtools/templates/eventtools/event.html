@@ -3,29 +3,11 @@
 
 {% block title %}{{ event.title }} :: {{ block.super }}{% endblock %}
 
-{% block breadcrumbs %}
-	{% include "eventtools/_breadcrumbs.html" %}
-{% endblock %}
-
-
 {% block content %}
 	<h1>{{ event.title }}</h1>
 	{% if perms.events.can_change_event %}<p><a href="{% url admin:events_event_change event.pk %}">edit</a></p>{% endif %}
 
 	<p class="season">When: {{ event.sessions|linebreaksbr }}<p>
-	
-	{% with event.get_children as children %}
-		{% if children %}
-		<h2>{{ event.title }} includes</h2>
-		<ul class="children">
-			{% for event in children %}
-			 <li>{% include "eventtools/_event_in_list.html" %}</li>
-			{% endfor %}
-		</ul>
-		{% endif %}
-	{% endwith %}
-
-
 
 	{% nav_calendars event.complete_occurrences %}
 
@@ -46,19 +28,5 @@
 		</div>
 		{% endif %}
 	{% endwith %}
-
-
-	{% if event.parent != event.root %}
-		{% with event.get_siblings as siblings %}
-			{% if siblings %}
-				<h2>More events in <a href="{{ event.parent.get_absolute_url }}">{{ event.parent.title }}</a></h2>
-				<ul>
-					{% for event in siblings %}
-						<li>{% include "eventtools/_event_in_list.html" %}</li>
-					{% endfor %}
-				</ul>
-			{% endif %}
-		{% endwith %}
-	{% endif %}
 
 {% endblock %}
