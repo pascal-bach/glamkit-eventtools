@@ -79,11 +79,12 @@ Admin
 6. Set up admin. In ``events/admin.py``:
 
     from django.contrib import admin
-    from eventtools.admin import EventAdmin
-    from .models import Event
+    from eventtools.admin import EventAdmin, OccurrenceAdmin
+    from .models import Event, Occurrence
 
     admin.site.register(Event, EventAdmin(Event))
-    
+    admin.site.register(Occurrence, OccurrenceAdmin(Occurrence))
+
 Views and URLs
 --------------
     
