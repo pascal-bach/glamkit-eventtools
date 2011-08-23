@@ -312,7 +312,7 @@ class EventModel(MPTTModel):
         the occurrences if not provided)"
     )
     sessions_description = models.TextField(_("sessions"), blank=True,
-        null=True, help_text="a more detailed description of when sessions are\
+        null=True, help_text="a detailed description of when sessions are\
         (e.g. \'Tuesdays and Thursdays throughout Feburary, at 10:30am\')"
     )
 

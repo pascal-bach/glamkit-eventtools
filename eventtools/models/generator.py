@@ -75,14 +75,14 @@ class GeneratorModel(models.Model):
             self.event_end.time == time.max
 
         if not self.rule_id:
-            raise ExceptionClass('a rule must be supplied')
+            raise ExceptionClass('A Rule must be given')
     
         if self.event_start > self.event_end:
-            raise ExceptionClass('start must be earlier than end')
+            raise ExceptionClass('Start must be earlier than End')
         if self.repeat_until is not None and \
                 self.repeat_until < self.event_end:
             raise ExceptionClass(
-                'repeat_until must not be earlier than start')
+                'Repeat until must not be earlier than start')
         # This data entry mistake is common enough to justify a slight hack.
         if self.rule.frequency == 'DAILY' \
                 and self.event_duration() > timedelta(1):
