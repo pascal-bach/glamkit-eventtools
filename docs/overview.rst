@@ -20,27 +20,44 @@ This separation into three models allows us to do some very cool things:
 * we can attach multiple Generators to the same event (eg. the same tour might also happen at 11am every weekday, except during December and January);
 * we can specify an end date for these repetition rules, or have them repeat infinitely (although since we can't store an infinite number of occurrences, we only generate a year into the futue. This is a setting which can be changed);
 
-Umbrella events and event variations
-------------------------------------
+Event variations
+----------------
 
-Organisations which organise events are familiar with the notion of some events 'belonging to' other umbrella events. For example, a film night may contain several screenings. A film festival may contain several film nights.
+Organisations which organise events are familiar with the notion of some events  being special one-off variations of other events. For example, a monthly series of film screenings may have the same overall information every month, but different films. Or a film that shows every night in a month might have a directors' talk one night.
 
-Furthermore, some events may be special one-off variations of other events. For example, a monthly series of film screenings may have the same overall information every month, but different films. Or a film that shows every night in a month might have a directors' talk one night.
+(Note: it might be tempting to use the tree arrangement for 'parent events' e.g. Festivals, and events which are part of the festival. In our experience, events and their 'parents' are rarely in a strict tree arrangement, so we use a many-to-many relation between a model which represents Events, and a model which represents parent, or rather umbrella, events. Depending on your arrangement, an umbrella event may be another Event, or another model entirely.)
 
-Both of these things can be modelled by arranging events in a tree. Events know about their parent events and child events, and this information can be used in a template.
+In Eventtools, Event variations are modelled by arranging events in a tree, with 'template' events (with no occurrences) higher in the tree, and 'actual' events (with occurrences) lower in the tree.
 
 An example arrangement might look like this:
 
-    Australian film festival
-    |---Mad Max Trilogy
-        |---Screening: Mad Max
-        |---Screening: Mad Max II
-        |---Screening: Mad Max: Beyond Thunderdrome
-    |---Red Curtain Trilogy
-        |---Screening: Moulin Rouge
-        |---Screening: Strictly Ballroom
-        |---Screening: Romeo and Juliet
-            |---Screening: Romeo and Juliet with Director's talk
+    Screening
+    |---Outdoor Screening
+        |---Mad Max
+            |---Mad Max II
+        |---Red Curtain
+            |---Moulin Rouge
+            |---Strictly Ballroom
+            |---Romeo and Juliet
+                |---Romeo and Juliet with Director's talk
+
+Child events can automatically inherit some attributes from parent events.
+
+To define inherited fierds, declare an EventMeta class in your Event model:
+
+    class Event(EventModel):
+        ...
+    
+        class EventMeta:
+            fields_to_inherit = ('description', 'price', 'booking_info')
+        ...     
+
+This results in the following:
+
+    * Changes to the parent model 'cascade' to child models, unless the child model already has a different value.
+    * When you view an event, it shows the 'diff' of the child event from its parent
+    * When you create a child event by clicking 'create child event', the values in the admin form are pre-populated.
+
 
 Exclusions
 ----------
@@ -49,8 +66,8 @@ An Exclusion is a way to prevent an Occurrence from being created by a Generator
 
 For example, if a film is on every night for a month, but on one night there is a director's talk, then the Event arrangement is:
 
-    Film <-- has an Occurrence Generator that repeats daily for a month
-    |---Film with director's talk <-- has a one-off Occurrence
+    Film    <-- has an Occurrence Generator that repeats daily for a month
+    |---Film with director's talk   <-- has a one-off Occurrence
     
 This will result in two occurrences on the night of the director's talk, one for the Film, and one for the Film with director's talk. In this case, you'd add an Exclusion for the Film on that night.
 
