@@ -33,26 +33,22 @@ class EventQuerySet(models.query.QuerySet):
             .filter(event__in=self)\
             .filter(*args, **kwargs)
         
-    def complete_occurrences(self, *args, **kwargs):
-        """
-        Returns the occurrences for events in this queryset and their children.
-        """
-        event_ids = []
-        for e in self:
-            for c in e.get_descendants(include_self=True):
-                event_ids.append(c.id)
-        
-        return self.model.OccurrenceModel().objects\
-            .filter(event__in=event_ids)\
-            .filter(*args, **kwargs)
+    # def complete_occurrences(self, *args, **kwargs):
+    #     """
+    #     Returns the occurrences for events in this queryset and their children.
+    #     """
+    #     event_ids = []
+    #     for e in self:
+    #         for c in e.get_descendants(include_self=True):
+    #             event_ids.append(c.id)
+    #     
+    #     return self.model.OccurrenceModel().objects\
+    #         .filter(event__in=event_ids)\
+    #         .filter(*args, **kwargs)
         
     def opening_occurrences(self):
         """
         Returns the opening occurrences for the events in this queryset.
-        
-        Since it uses Event.opening_occurrence(), the default behaviour is to
-        look at the complete_occurrences (ie, occurrences of children are
-        included).
         """
         pks = []
         for e in self:
@@ -65,9 +61,6 @@ class EventQuerySet(models.query.QuerySet):
     def closing_occurrences(self):
         """
         Returns the closing occurrences for the events in this queryset.
-        
-        Since it uses Event.opening_occurrence(), the behaviour is to look at
-        the complete_occurrences (ie, occurrences of children are included).
         """
         pks = []
         for e in self:
@@ -76,82 +69,7 @@ class EventQuerySet(models.query.QuerySet):
             except AttributeError:
                 pass
         return self.occurrences(pk__in=pks)
-        
-    def _with_relatives_having(self, relatives_fn, *args, **kwargs):
-        """
-        Return the set of items in self that have relatives matching a
-        particular criteria.
-        """
-        match_ids = set()
-        for obj in self:
-            matches = relatives_fn(obj)
-            if matches.count(): #weird bug where filter returns results on an empty qs!
-                matches = matches.filter(*args, **kwargs)
-                if matches.count():
-                    match_ids.add(obj.id)
-        return self.filter(id__in=match_ids)
-
-    def _without_relatives_having(self, relatives_fn, *args, **kwargs):
-        """
-        Return the set of items in self that have 0 relatives matching a
-        particular criteria.
-        """
-        match_ids = set()
-        for obj in self:
-            matches = relatives_fn(obj)
-            if matches.count(): #weird bug where filter returns results on an empty qs!
-                matches = matches.filter(*args, **kwargs)
-                if matches.count() == 0:
-                    match_ids.add(obj.id)
-            else: #no relatives => win
-                    match_ids.add(obj.id)                
-        return self.filter(id__in=match_ids)
-
-    def with_children_having(self, *args, **kwargs):
-        return self._with_relatives_having(
-            lambda x: x.get_children(), *args, **kwargs
-        )
-        
-    def with_descendants_having(self, *args, **kwargs):
-        include_self = kwargs.pop('include_self', True)
-        return self._with_relatives_having(
-            lambda x: x.get_descendants(include_self=include_self),
-            *args,
-            **kwargs
-        )
-
-    def with_parent_having(self, *args, **kwargs):
-        return self._with_relatives_having(
-            lambda x: self.filter(id=x.parent_id), *args, **kwargs
-        )
-
-    def with_ancestors_having(self, *args, **kwargs):
-        return self._with_relatives_having(
-            lambda x: x.get_ancestors(), *args, **kwargs
-        )
-
-    def without_children_having(self, *args, **kwargs):
-        return self._without_relatives_having(
-            lambda x: x.get_children(), *args, **kwargs
-        )
-
-    def without_descendants_having(self, *args, **kwargs):
-        include_self = kwargs.pop('include_self', True)
-        return self._without_relatives_having(
-            lambda x: x.get_descendants(include_self=include_self), 
-            *args, **kwargs
-        )
-
-    def without_parent_having(self, *args, **kwargs):
-        return self._without_relatives_having(
-            lambda x: self.filter(id=x.parent_id), *args, **kwargs
-        )
-
-    def without_ancestors_having(self, *args, **kwargs):
-        return self._without_relatives_having(
-            lambda x: x.get_ancestors(), *args, **kwargs
-        )
-        
+                
     #some simple annotations
     def having_occurrences(self):
         return self.annotate(num_occurrences=Count('occurrences'))\
@@ -164,24 +82,7 @@ class EventQuerySet(models.query.QuerySet):
     def having_no_occurrences(self):
         return self.having_n_occurrences(0)
         
-    def highest_having_occurrences(self):
-        """
-        the highest objects that have occurrences meet these conditions:
-            a) they have occurrences
-            b) none of their ancestors have occurrences
         
-        This is a possible first blush at 'The List Of Events', since it is the
-        longest list of events whose descendants' occurrences will cover the
-        entire set of occurrences with no repetitions.
-        """
-        return self.having_occurrences()._without_relatives_having(
-            lambda x: x.get_ancestors().annotate(
-                num_occurrences=Count('occurrences')
-            ),
-            num_occurrences__gt=0
-        )
-
-
 class EventTreeManager(TreeManager):
     
     def get_query_set(self): 
@@ -197,31 +98,12 @@ class EventTreeManager(TreeManager):
     def closing_occurrences(self, *args, **kwargs):
         return self.get_query_set().closing_occurrences(*args, **kwargs)
 
- 
-    def with_children_having(self, *args, **kwargs):
-        return self.get_query_set().with_children_having(*args, **kwargs)        
-    def with_descendants_having(self, *args, **kwargs):
-        return self.get_query_set().with_descendants_having(*args, **kwargs)        
-    def with_parent_having(self, *args, **kwargs):
-        return self.get_query_set().with_parent_having(*args, **kwargs)        
-    def with_ancestors_having(self, *args, **kwargs):
-        return self.get_query_set().with_ancestors_having(*args, **kwargs)        
-    def without_children_having(self, *args, **kwargs):
-        return self.get_query_set().without_children_having(*args, **kwargs)        
-    def without_descendants_having(self, *args, **kwargs):
-        return self.get_query_set().without_descendants_having(*args, **kwargs)        
-    def without_parent_having(self, *args, **kwargs):
-        return self.get_query_set().without_parent_having(*args, **kwargs)        
-    def without_ancestors_having(self, *args, **kwargs):
-        return self.get_query_set().without_ancestors_having(*args, **kwargs)        
     def having_occurrences(self):
         return self.get_query_set().having_occurrences()        
     def having_n_occurrences(self, n):
         return self.get_query_set().having_n_occurrences(n)        
     def having_no_occurrences(self):
         return self.get_query_set().having_no_occurrences()        
-    def highest_having_occurrences(self):
-        return self.get_query_set().highest_having_occurrences()        
             
 class EventOptions(object):
     """
@@ -303,7 +185,7 @@ class EventModel(MPTTModel):
     __metaclass__ = EventModelBase
     
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
-    title = models.CharField(max_length=100)
+    title = models.CharField(max_length=255)
     slug = models.SlugField("URL name", unique=True, help_text="This is used in\
      the event's URL, and should be unique and unchanging.")
     season_description = models.CharField(_("season"), blank=True, null=True, 
@@ -313,7 +195,7 @@ class EventModel(MPTTModel):
     )
     sessions_description = models.TextField(_("sessions"), blank=True,
         null=True, help_text="a detailed description of when sessions are\
-        (e.g. \'Tuesdays and Thursdays throughout Feburary, at 10:30am\')"
+        (e.g. \'Tuesdays and Thursdays throughout February, at 10:30am\')"
     )
 
     class Meta:
@@ -385,40 +267,21 @@ class EventModel(MPTTModel):
                         continue
                 child.save() #cascades to grandchildren
     
-    def complete_occurrences(self):
-        return self.get_descendants(include_self=True).occurrences()
-
-    def complete_occurrences_count(self):
+    def occurrences_count(self):
         """needed by admin"""
-        return self.complete_occurrences().count()
+        return self.occurrences().count()
         
-    def direct_opening_occurrence(self):
+    def opening_occurrence(self):
         try:
             return self.occurrences.all()[0]
         except IndexError:
             return None
         
-    def direct_closing_occurrence(self):
+    def closing_occurrence(self):
         try:
             return self.occurrences.all().reverse()[0]
         except IndexError:
             return None
-
-    def complete_opening_occurrence(self):
-        try:
-            return self.complete_occurrences().all()[0]
-        except IndexError:
-            return None
-        
-    def complete_closing_occurrence(self):
-        try:
-            return self.complete_occurrences().all().reverse()[0]
-        except IndexError:
-            return None
-            
-    opening_occurrence = complete_opening_occurrence
-    closing_occurrence = complete_closing_occurrence
-
 
     def get_absolute_url(self):
         return reverse('events:event', kwargs={'event_slug': self.slug })

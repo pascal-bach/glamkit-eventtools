@@ -48,7 +48,7 @@ background:#BBFFBB none repeat scroll 0 0;
   {{ block.super }}
   {% if original and object.id %}
     <p>
-       <a href="create_child/">[ Create child event ]</a>
+       <a href="create_variation/">[ Create a variation of this event ]</a>
        <a href="{{ occurrence_edit_url }}">[ View all {{ object.complete_occurrences_count }} occurrences ]</a>
     </p>
   {% endif %}
@@ -57,7 +57,7 @@ background:#BBFFBB none repeat scroll 0 0;
 		{% drilldown_tree_for_node object as drilldown %}	
 		{% if drilldown %}
 			<fieldset class="module aligned ">
-				<h2>Ancestors and children</h2>
+				<h2>Variation family</h2>
 				{% for node,structure in drilldown|tree_info %}
 						{% if structure.new_level %}<ul><li>{% else %}</li><li>{% endif %}
 						{% ifequal node object %}

@@ -226,21 +226,28 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 )
                 
         def occurrence_link(self, event):
-            return '<a href="%s">View all %s Occurrences</a>' % (
-                self.occurrence_edit_url(event),
-                event.complete_occurrences_count(),
-            )             
+            count = event.complete_occurrences_count()
+            url = self.occurrence_edit_url(event)
+            if count == 1:
+                return '<a href="%s">View 1 Occurrence</a>' % (
+                    url,
+                )
+            else:
+                return '<a href="%s">View all %s Occurrences</a>' % (
+                    url,
+                    count,
+                )
         occurrence_link.short_description = 'Occurrences'
         occurrence_link.allow_tags = True
 
         def get_urls(self):
             return patterns(
                 '',
-                url(r'(?P<parent_id>\d+)/create_child/',
-                    self.admin_site.admin_view(self._create_child))
+                url(r'(?P<parent_id>\d+)/create_variation/',
+                    self.admin_site.admin_view(self._create_variation))
                 ) + super(_EventAdmin, self).get_urls()
         
-        def _create_child(self, request, parent_id):
+        def _create_variation(self, request, parent_id):
             parent = get_object_or_404(EventModel, id=parent_id)
             child = EventModel(parent=parent)
         

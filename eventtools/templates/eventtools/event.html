@@ -21,7 +21,7 @@
 				{% for day in day_list %}
 					<dt data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ day.grouper|date:"l, j F Y" }}</dt>
 					{% for o in day.list %}
-						<dd data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ o.html_time_description }}{% if o.event != event %}: <a href="{{ o.event.get_absolute_url }}">{{ o.event }}</a>{% endif %}</dd>
+						<dd data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ o.html_time_description }}</dd>
 					{% endfor %}
 				{% endfor %}
 			</dl>
