@@ -10,6 +10,8 @@ from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import humanized_date_range
 from eventtools.utils.viewutils import paginate, response_as_ical, parse_GET_date
 
+import datetime
+
 
 class EventViews(object):
 
@@ -28,6 +30,7 @@ class EventViews(object):
         return (
             patterns('',
                 url(r'^$', self.index, name='index'),
+                url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/$', self.on_date, name='on_date'),
                 url(r'^(?P<event_slug>[-\w]+)/$', self.event, name='event'),
         
                 #ical - needs rethinking
@@ -60,8 +63,6 @@ class EventViews(object):
         else:
             occurrence_pool = qs.between(fr, to)
 
-        occurrence_pool, date_bounds = qs.from_GET(request.GET)       
-        
         pageinfo = paginate(request, occurrence_pool)
 
         return {
@@ -69,21 +70,37 @@ class EventViews(object):
             'pageinfo': pageinfo,
             'occurrence_pool': occurrence_pool,
             'occurrence_page': pageinfo.object_list,            
-            'selected_start': fr,        
-            'selected_end': to,
+            'day': fr,
             'occurrence_qs': qs,
         }
+        
     
     def occurrence_list(self, request): #probably want to override this for doing more filtering.
-        occurrence_context = self._occurrence_list_context(request, self.occurrence_qs)
         template = 'eventtools/occurrence_list.html'
-            
-        return render_to_response(template, occurrence_context, context_instance=RequestContext(request))
+        context = RequestContext(request)
+        context.update(self._occurrence_list_context(request, self.occurrence_qs))        
+        return render_to_response(template, context)
     
     # def occurrence_list_ical(self, request):
     #     occurrence_list_context = self._occurrence_list_context(request, self.occurrence_qs)
     #     pool = occurrence_list_context['occurrence_pool']
     #     return response_as_ical(request, pool)
 
+    def on_date(self, request, year, month, day):
+        template = 'eventtools/occurrence_list.html'
+        day = datetime.date(int(year), int(month), int(day))
+        event_pool = self.occurrence_qs.starts_on(day)
+
+        context = RequestContext(request)
+        context['occurrence_pool'] = event_pool
+        context['day'] = day
+        context['occurrence_qs'] = self.occurrence_qs
+        return render_to_response(template, context)
+        
     def index(self, request):
         return self.occurrence_list(request)
+
+    # In your subclass, you may prefer: 
+    # def index(self, request):
+    #     today = datetime.date.today()
+    #     return self.on_date(request, today.year, today.month, today.day)
