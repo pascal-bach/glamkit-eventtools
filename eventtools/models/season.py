@@ -3,7 +3,7 @@ from eventtools.utils.pprint_timespan \
     import pprint_datetime_span, pprint_date_span
 from django.core.exceptions import ValidationError
 
-class SeasonModelManager(models.Manager):
+class SeasonQSFN(object):
     def current_on(self, date):
         return self.filter(start__lte=date, end__gte=date)
         
@@ -12,6 +12,32 @@ class SeasonModelManager(models.Manager):
         
     def previous_on(self, date):
         return self.filter(end__lt=date)
+
+class SeasonQuerySet(models.query.QuerySet, SeasonQSFN):
+    pass #all the goodness is inherited from SeasonQSFN
+
+class SeasonManagerType(type):
+    """
+    Injects proxies for all the queryset's functions into the Manager
+    """
+    @staticmethod
+    def _fproxy(name):
+        def f(self, *args, **kwargs):
+            return getattr(self.get_query_set(), name)(*args, **kwargs)
+        return f
+
+    def __init__(cls, *args):
+        for fname in dir(SeasonQSFN):
+            if not fname.startswith("_"):
+                setattr(cls, fname, SeasonManagerType._fproxy(fname))
+        super(SeasonManagerType, cls).__init__(*args)
+
+class SeasonManager(models.Manager):    
+    __metaclass__ = SeasonManagerType
+
+    def get_query_set(self): 
+        return SeasonQuerySet(self.model)
+
 
 class SeasonModel(models.Model):
     """
@@ -24,7 +50,7 @@ class SeasonModel(models.Model):
     start = models.DateField(null=True, blank=True)
     end = models.DateField(null=True, blank=True)
     
-    objects = SeasonModelManager()
+    objects = SeasonManager()
 
     class Meta:
         abstract = True
