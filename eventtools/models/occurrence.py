@@ -17,7 +17,6 @@ from django.utils.translation import ugettext as _
 from eventtools.utils import datetimeify, dayify
 from eventtools.conf import settings
 from eventtools.utils import dateranges
-from eventtools.utils.viewutils import parse_GET_date
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 from eventtools.utils.domain import django_root_url
 
@@ -309,17 +308,7 @@ class OccurrenceQuerySetFN(object):
         occurrences.
         """
         event_ids = self.values_list('event_id', flat=True).distinct()
-        return self.model.EventModel()._event_manager.filter(id__in=event_ids)
-        
-    def from_GET(self, GET={}): # TODO: this is a little viewish. should be moved.
-        fr, to = parse_GET_date(GET)
-
-        if to is None:
-            return self.after(fr), (fr, to)
-        if fr is None:
-            return self.before(to).reverse(), (fr, to)
-        return self.between(fr, to), (fr, to)
-                
+        return self.model.EventModel()._event_manager.filter(id__in=event_ids)                
         
 class OccurrenceQuerySet(models.query.QuerySet, OccurrenceQuerySetFN):
     pass #all the goodness is inherited from OccurrenceQuerySetFN

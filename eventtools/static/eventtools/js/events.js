@@ -1,6 +1,6 @@
 (function($) {
 	$(document).ready(function() {
-		
+				
 		// make calendars scrollable
 		var $el = $(".calendarlist .scrollable")
 		$el.scrollable();

@@ -8,11 +8,12 @@ from django.utils.safestring import mark_safe
 
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import humanized_date_range
-from eventtools.utils.viewutils import paginate, response_as_ical
+from eventtools.utils.viewutils import paginate, response_as_ical, parse_GET_date
+
 
 class EventViews(object):
 
-# Have currently disabled date ranges, and icals.
+# Have currently disabled icals.
 
     def __init__(self, event_qs, occurrence_qs=None):
         self.event_qs = event_qs
@@ -38,21 +39,7 @@ class EventViews(object):
             "events", # application namespace
             "events", # instance namespace
         )
-            
-    #occurrence
-    # def _occurrence_context(self, request, occurrence_id):
-    #     return {
-    #         'occurrence': get_object_or_404(self.occurrence_qs, id=occurrence_id)
-    #     }
-    # 
-    # def occurrence(self, request, occurrence_id, ignored_part=None):
-    #     context = self._occurrence_context(request, occurrence_id)
-    #     return render_to_response('eventtools/occurrence.html', context, context_instance=RequestContext(request))
-    # 
-    # def occurrence_ical(self, request, occurrence_id):
-    #     context = self._occurrence_context(request, occurrence_id)
-    #     return response_as_ical(request, [context['occurrence']])
-        
+                    
     def event(self, request, event_slug):
         event = get_object_or_404(self.event_qs, slug=event_slug)
         context = RequestContext(request)
@@ -66,57 +53,29 @@ class EventViews(object):
 
     #occurrence_list
     def _occurrence_list_context(self, request, qs):
-        occurrence_pool, date_bounds = qs.from_GET(request.GET)
-        if date_bounds[0] is not None and date_bounds[1] is not None:
-            # we're doing a date-bounded view. We can't keep the pool bound
-            date_delta = relativedelta(date_bounds[1]+relativedelta(days=1), date_bounds[0])
-    
-            earlier = (date_bounds[0] - date_delta, date_bounds[1] - date_delta)
-            later = (date_bounds[0] + date_delta, date_bounds[1] + date_delta) 
-            
-            pageinfo = {
-                'date_span': mark_safe(humanized_date_range(*date_bounds, imply_year=False, space="&nbsp;", range_str="&ndash;")),
-                'previous_date_span': {
-                    'start': earlier[0].isoformat(),
-                    'end': earlier[1].isoformat(),
-                },
-                'next_date_span': {
-                    'start': later[0].isoformat(),
-                    'end': later[1].isoformat(),
-                },
-                'date_delta': date_delta.days
-            }
-            
-            return {
-                'bounded': True,
-                'pageinfo': pageinfo,
-                'occurrence_pool': qs,
-                'occurrence_page': occurrence_pool,
-                'selected_start': date_bounds[0],        
-                'selected_end': date_bounds[1],
-                'occurrence_qs': qs,
-            }
-            
-        else:         
-            pageinfo = paginate(request, occurrence_pool)
+        fr, to = parse_GET_date(request.GET)
 
-            return {
-                'bounded': False,
-                'pageinfo': pageinfo,
-                'occurrence_pool': occurrence_pool,
-                'occurrence_page': pageinfo.object_list,            
-                'selected_start': date_bounds[0],        
-                'selected_end': date_bounds[1],        
-                'occurrence_qs': qs,
-            }
+        if to is None:
+            occurrence_pool = qs.after(fr)
+        else:
+            occurrence_pool = qs.between(fr, to)
+
+        occurrence_pool, date_bounds = qs.from_GET(request.GET)       
+        
+        pageinfo = paginate(request, occurrence_pool)
+
+        return {
+            'bounded': False,
+            'pageinfo': pageinfo,
+            'occurrence_pool': occurrence_pool,
+            'occurrence_page': pageinfo.object_list,            
+            'selected_start': fr,        
+            'selected_end': to,
+            'occurrence_qs': qs,
+        }
     
     def occurrence_list(self, request): #probably want to override this for doing more filtering.
         occurrence_context = self._occurrence_list_context(request, self.occurrence_qs)
-
-        # trying without later bounds for simplicity
-        # if occurrence_context['bounded']: #2 dates given
-        #     template = 'eventtools/occurrence_datespan.html'
-        # else:
         template = 'eventtools/occurrence_list.html'
             
         return render_to_response(template, occurrence_context, context_instance=RequestContext(request))

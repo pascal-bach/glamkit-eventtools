@@ -44,15 +44,18 @@ background:#BBFFBB none repeat scroll 0 0;
 </style>
 {% endblock %}
 
-{% block object-tools %}
+
+
+{% block object-tools-items %}
   {{ block.super }}
   {% if original and object.id %}
-    <p>
-       <a href="create_variation/">[ Create a variation of this event ]</a>
-       <a href="{{ occurrence_edit_url }}">[ View all {{ object.complete_occurrences_count }} occurrences ]</a>
-    </p>
+    <li><a href="create_variation/">Create a variation of this event</a></li>
+		<li><a href="{{ occurrence_edit_url }}">View all occurrences ({{ object.occurrences.count }})</a></li>
   {% endif %}
+{% endblock %}
 
+{% block object-tools %}
+	{{ block.super }}
 	{% if object.id %}
 		{% drilldown_tree_for_node object as drilldown %}	
 		{% if drilldown %}

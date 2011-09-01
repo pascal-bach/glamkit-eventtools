@@ -32,20 +32,7 @@ class EventQuerySet(models.query.QuerySet):
         return self.model.OccurrenceModel().objects\
             .filter(event__in=self)\
             .filter(*args, **kwargs)
-        
-    # def complete_occurrences(self, *args, **kwargs):
-    #     """
-    #     Returns the occurrences for events in this queryset and their children.
-    #     """
-    #     event_ids = []
-    #     for e in self:
-    #         for c in e.get_descendants(include_self=True):
-    #             event_ids.append(c.id)
-    #     
-    #     return self.model.OccurrenceModel().objects\
-    #         .filter(event__in=event_ids)\
-    #         .filter(*args, **kwargs)
-        
+                
     def opening_occurrences(self):
         """
         Returns the opening occurrences for the events in this queryset.
@@ -91,8 +78,7 @@ class EventTreeManager(TreeManager):
         
     def occurrences(self, *args, **kwargs):
         return self.get_query_set().occurrences(*args, **kwargs)
-    def complete_occurrences(self, *args, **kwargs):
-        return self.get_query_set().complete_occurrences(*args, **kwargs)
+
     def opening_occurrences(self, *args, **kwargs):
         return self.get_query_set().opening_occurrences(*args, **kwargs)
     def closing_occurrences(self, *args, **kwargs):

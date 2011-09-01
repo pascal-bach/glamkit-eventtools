@@ -9,9 +9,9 @@
 
 	<p class="season">When: {{ event.sessions|linebreaksbr }}<p>
 
-	{% nav_calendars event.complete_occurrences %}
+	{% nav_calendars event.occurrences %}
 
-	{% with event.complete_occurrences.all as occurrences %}
+	{% with event.occurrences.all as occurrences %}
 		{% if occurrences %}
 		<div id="sessions">
 			{% regroup occurrences by start_date as day_list %}

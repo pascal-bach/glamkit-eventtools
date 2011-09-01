@@ -226,7 +226,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 )
                 
         def occurrence_link(self, event):
-            count = event.complete_occurrences_count()
+            count = event.occurrences_count()
             url = self.occurrence_edit_url(event)
             if count == 1:
                 return '<a href="%s">View 1 Occurrence</a>' % (
