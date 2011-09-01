@@ -293,10 +293,10 @@ class OccurrenceQuerySetFN(object):
 
     #misc queries (note they assume starts_ and ends_)
     def forthcoming(self):
-        return self.starts_after(datetime.now())
+        return self.starts_after(date.today())
 
     def recent(self):
-        return self.ends_before(datetime.now())
+        return self.ends_before(date.today())
         
     def now_on(self):
         n = datetime.now()
