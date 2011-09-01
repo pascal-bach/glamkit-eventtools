@@ -255,7 +255,7 @@ class EventModel(MPTTModel):
     
     def occurrences_count(self):
         """needed by admin"""
-        return self.occurrences().count()
+        return self.occurrences.count()
         
     def opening_occurrence(self):
         try:
