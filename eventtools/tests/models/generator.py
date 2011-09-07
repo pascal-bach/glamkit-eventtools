@@ -503,5 +503,55 @@ class TestGenerators(AppTestCase):
         self.ae(self.weekly_generator.occurrences.count(), weekly_count)
         self.ae(self.dupe_weekly_generator.occurrences.count(), weekly_count)
         
-        
-        
+
+    def test_regenerate_with_related_items(self):
+        event = ExampleEvent.objects.create(title="Curator's Talk", slug="curators-talk-1")
+        # is on every week for a year
+        weekly = Rule.objects.create(frequency = "WEEKLY")
+        generator = event.generators.create(start=datetime(2010,1,1, 9,00), _duration=60, rule=weekly, repeat_until=date(2010,12,31))
+
+        # that means there are 53 occurrences generated
+        self.ae(generator.occurrences.count(), 53)
+        # and one of them is on a particular date
+        ticketed_occurrence = event.occurrences.all().reverse()[0]
+        # now I buy a ticket to the occurrence
+        ticket = ExampleTicket.objects.create(occurrence=ticketed_occurrence)
+
+        # oh wait, I made a data entry mistake! The talk is on every week only for 6 months
+        generator.repeat_until = date(2010, 7, 1)
+        generator.save()
+        # that means there are 26 occurrences generated
+        self.ae(generator.occurrences.count(), 26)
+
+        # since I bought a ticket, the occurrence that has a ticket is now manual
+        self.assertTrue(ticket.occurrence)
+        self.ae(event.occurrences.get(id=ticket.occurrence.id).generated_by, None)
+
+        # but there are no other manual occurrences, meaning 27 occurrences in total
+        self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
+        self.ae(event.occurrences.count(), 27)
+
+    def test_delete_with_related_items(self):
+        event = ExampleEvent.objects.create(title="Curator's Talk", slug="curators-talk-2")
+        # is on every week for a year
+        generator = event.generators.create(start=datetime(2010,1,1, 9,00), _duration=60, rule=self.weekly_generator.rule, repeat_until=date(2010,12,31))
+
+        # that means there are 53 occurrences generated
+        self.ae(generator.occurrences.count(), 53)
+        # and one of them is on a particular date
+        ticketed_occurrence = event.occurrences.all().reverse()[0]
+        # now I buy a ticket to the occurrence
+        ticket = ExampleTicket.objects.create(occurrence=ticketed_occurrence)
+
+        # oh wait, I made a data entry mistake! Deleting the generator.
+        generator.delete()
+
+        # since I bought a ticket, the occurrence that has a ticket is now manual.
+        ticket = ExampleTicket.objects.get(pk=ticket.pk)
+        self.assertTrue(ticket.occurrence)
+        self.ae(ticket.occurrence.generated_by, None)
+
+        # but there are no other manual occurrences, meaning 1 occurrence in total
+        self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
+        self.ae(event.occurrences.count(), 1)
+

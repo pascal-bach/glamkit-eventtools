@@ -60,7 +60,12 @@ def _remove_occurrences(modeladmin, request, queryset):
             m.event.exclusions.get_or_create(start=m.start)
         m.delete()
 _remove_occurrences.short_description = "delete occurrences (and create exclusions)"
-        
+
+def _wipe_occurrences(modeladmin, request, queryset):
+    queryset.delete()
+_wipe_occurrences.short_description = "delete occurrences (without creating exclusions)"
+
+
 def _convert_to_manual(modeladmin, request, queryset):
     for m in queryset:
         # if the occurrence was generated, then add it as an exclusion.
@@ -68,13 +73,13 @@ def _convert_to_manual(modeladmin, request, queryset):
             m.event.exclusions.get_or_create(start=m.start)
     queryset.update(generated_by=None)
 _convert_to_manual.short_description = "make occurrence manual (and create exclusions)"
-    
+
 
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
         list_display = ['string_if_editable', 'start', '_duration', 'is_automatic',]
         list_display_links = ['string_if_editable',]
-        # list_display_filter = [IsGeneratedListFilter,] #when 1.4 comes...
+        # list_filter = [IsGeneratedListFilter,] #when 1.4 comes...
         change_list_template = 'admin/eventtools/occurrence_list.html'
         formfield_overrides = {
             models.DateTimeField: {'form_class':DateAndMaybeTimeField},
@@ -82,7 +87,7 @@ def OccurrenceAdmin(OccurrenceModel):
         fields = ("event_edit_link", "start", "_duration", "generated_by")
         exclude=("event",)
         readonly_fields = ('event_edit_link', 'generated_by')
-        actions = [_remove_occurrences, _convert_to_manual]
+        actions = [_remove_occurrences, _wipe_occurrences, _convert_to_manual]
         date_hierarchy = 'start'
         
         def __init__(self, *args, **kwargs):

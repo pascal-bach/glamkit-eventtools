@@ -30,13 +30,13 @@ class XTimespanQSFN(object):
         d1, d2 = dayify(day)
         return self.starts_between(d1, d2)
 
-    #defaults
+    #defaults - implementers may wish to override with other kinds of queries
     before = starts_before
     after = starts_after
     between = starts_between
     on = starts_on
 
-    #misc queries (note they assume starts_ and ends_)
+    #misc queries (note they assume starts_)
     def forthcoming(self):
         return self.starts_after(date.today())
 
@@ -114,12 +114,12 @@ class XTimespanModel(models.Model):
         return self.timespan_description(html=True)
 
     def time_description(self, html=False):
-#        if self.all_day():
-#            return mark_safe(_("all day"))
+        if self.all_day():
+            return mark_safe(_("all day"))
 
         t1 = self.start.time()
-        if self.start.date() == self.end.date():
-            t2 = self.end.time()
+        if self.start.date() == self.end().date():
+            t2 = self.end().time()
         else:
             t2 = t1
 

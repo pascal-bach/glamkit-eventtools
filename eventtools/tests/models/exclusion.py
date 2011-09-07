@@ -12,10 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 class TestExclusions(AppTestCase):
-    def setUp(self):
-        super(TestExclusions, self).setUp()
-        generator_fixture(self)
-    
+
     def test_generation_then_exclusion(self):
         """
         If an Exclusion is saved, then:
@@ -23,7 +20,9 @@ class TestExclusions(AppTestCase):
         * Generated Occurrences that should be excluded are converted to manual.
         * Re-generating from generators will not re-generate that occurrence.
         """
-        
+
+        generator_fixture(self)
+
         clashingtime = datetime(2010,1,8,10,30)
         
         # Check we're starting the occurrence with a generator
@@ -49,7 +48,7 @@ class TestExclusions(AppTestCase):
         self.weekly_generator.save()
         self.dupe_weekly_generator.save()
         
-        # no ecxluded occurrence is (re)generated
+        # no excluded occurrence is (re)generated
         self.ae(self.bin_night.occurrences.filter(start = clashingtime).count(), 0)
 
     def test_clash(self):
@@ -60,6 +59,8 @@ class TestExclusions(AppTestCase):
             * the manual occurrence shouldn't be generated.
         """
         
+        generator_fixture(self)
+
         # Check there is an auto occurrence
         clashingtime = datetime(2010,1,8,10,30)
         auto_occs = self.bin_night.occurrences.filter(start = clashingtime)
@@ -99,25 +100,39 @@ class TestExclusions(AppTestCase):
         self.ae(manual_occs.count(), 1)
         self.assertTrue(manual_occs[0].generated_by is None)
         
-        
     def test_timeshift_into_exclusion(self):
         """
         If a generator is modified such that occurrences are timeshifted such
         that an occurrence matches an exclusion, then the occurrence should
-        be unhooked.
+        be deleted (or unhooked).
         """
-        
-        clashingtime = datetime(2010,1,8,11,00)
-        self.exclusion = self.bin_night.exclusions.create(
-            start = clashingtime
-        )
+        event = ExampleEvent.objects.create(title="Curator's Talk", slug="curators-talk-1")
+        # is on every week for a year
+        weekly = Rule.objects.create(frequency = "WEEKLY")
+        generator = event.generators.create(start=datetime(2010,1,1, 9,00), _duration=60, rule=weekly, repeat_until=date(2010,12,31))
 
-        #update start time
-        self.weekly_generator.start=datetime(2010,1,1,11,00)
-        self.weekly_generator.save()
-        
-        self.assertTrue(
-            self.bin_night.occurrences.get(
-                start = clashingtime
-            ).generated_by == None)
-        
+        # now I buy a ticket to the first occurrence
+        ticket = ExampleTicket.objects.create(occurrence=generator.occurrences.all()[0])
+
+        #here is an exclusion (to clash with the ticketed occurrence)
+        clashingtime = datetime(2010,1,1,9,05)
+        self.exclusion = event.exclusions.create(start = clashingtime)
+        #and another to clash with an unticketed occurrence
+        clashingtime2 = datetime(2010,1,8,9,05)
+        self.exclusion = event.exclusions.create(start = clashingtime2)
+
+        self.ae(event.occurrences.count(), 53)
+
+        #update start time of generator 5 mins
+        generator.start=datetime(2010,1,1,9,05)
+        generator.save()
+
+        # the first clashing occurrence should still exist, as there are tickets attached
+        self.ae(event.occurrences.filter(start = clashingtime).count(), 1)
+        self.ae(event.occurrences.get(start = clashingtime).generated_by, None)
+
+        # the second clashing occurrence should no longer exist
+        self.ae(event.occurrences.filter(start = clashingtime2).count(), 0)
+
+        # overall, there is one less occurrence
+        self.ae(event.occurrences.count(), 52)

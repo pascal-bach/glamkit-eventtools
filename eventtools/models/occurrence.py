@@ -64,8 +64,7 @@ class OccurrenceModel(XTimespanModel):
     'occurrences'. In almost all situations, this FK should be optional.
     
         event = models.Foreignkey(SomeEvent, related_name="occurrences")
-        generated_by = models.ForeignKey(SomeGenerator, blank=True, null=True,
-            related_name="occurrences")
+        generated_by = models.ForeignKey(ExampleGenerator, related_name="occurrences", blank=True, null=True)
     """
 
     objects = OccurrenceManager()
@@ -88,6 +87,12 @@ class OccurrenceModel(XTimespanModel):
             return True
         return False
         
+    def delete(self, *args, **kwargs):
+        try:
+            r = super(OccurrenceModel, self).delete(*args, **kwargs)
+        except models.ProtectedError: #can't delete as there is an FK to me. Make manual.
+            self.generated_by = None
+            self.save()
 
     # ical is coming back soon.
     # def get_absolute_url(self):

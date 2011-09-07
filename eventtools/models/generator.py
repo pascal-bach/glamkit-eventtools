@@ -93,7 +93,6 @@ class GeneratorModel(XTimespanModel):
         # Occurrences updates/generates
         if self.pk:
             self._update_existing_occurrences() # need to do this before save, so we can detect changes
-
         r = super(GeneratorModel, self).save(*args, **kwargs)
         self._sync_occurrences() #need to do this after save, so we have a pk to hang new occurrences from.
     
@@ -123,11 +122,11 @@ class GeneratorModel(XTimespanModel):
         When you change a generator and save it, it updates existing occurrences
         according to the following rules:
         
-        Generally, we never automatically delete occurrences, we unhook them
+        Generally, if we can't automatically delete occurrences, we unhook them
         from the generator, and make them manual. This is to prevent losing
-        information like tickets sold or shout-outs. We leave implementors to
-        decide the workflow in these cases. We want to minimise the number of
-        events that are unhooked, however. So:
+        information like tickets sold or shout-outs (we leave implementors to
+        decide the workflow in these cases). We want to minimise the number of
+        events that are deleted or unhooked, however. So:
     
          * If start time or duration is changed, then no occurrences are
            added or removed - we timeshift all occurrences. We assume that
@@ -140,7 +139,7 @@ class GeneratorModel(XTimespanModel):
          * Occurrences that are added are fine, they are added in the normal
            way.
            
-         * Occurrences that are removed are unhooked, for reasons
+         * Occurrences that are removed are deleted or unhooked, for reasons
            described above.
         """
         
@@ -150,7 +149,8 @@ class GeneratorModel(XTimespanModel):
             update the start times of my occurrences
         if end date or time is changed:
             update the end times of my occurrences
-                        
+
+        Pass 2 is in _sync_occurrences, below.
         """
         
         # TODO: it would be ideal to minimise the consequences of shifting one
@@ -165,7 +165,7 @@ class GeneratorModel(XTimespanModel):
         
         start_shift = self.start - saved_self.start
         duration_changed = self._duration != saved_self._duration
-        
+
         if start_shift or duration_changed:
             for o in self.occurrences.all():
                 o.start += start_shift
@@ -179,8 +179,8 @@ class GeneratorModel(XTimespanModel):
         """
         * For candidate occurrences that exist, do nothing.
         * For candidate occurrences that do not exist, add them.
-        * For existing occurrences that are not candidates, unhook them from the
-          generator
+        * For existing occurrences that are not candidates, delete them, or unhook them from the
+          generator if they are protected by a Foreign Key.
             
         In detail:
         Get a list, A, of already-generated occurrences.
@@ -199,22 +199,22 @@ class GeneratorModel(XTimespanModel):
         """
         
         all_occurrences = self.event.occurrences.all() #regardless of generator
-        unaccounted_for = set(self.occurrences.all())
-                
+        existing_but_not_regenerated = set(self.occurrences.all())
+
         for start in self._generate_dates():
             # if the proposed occurrence exists, then don't make a new one.
             # However, if it belongs to me: 
             #       and if it is marked as an exclusion:
-            #           do nothing (it will later get unhooked)
+            #           do nothing (it will later get deleted/unhooked)
             #       else:
-            #           remove it from the set of unaccounted_for
+            #           remove it from the set of existing_but_not_regenerated
             #           occurrences so it stays hooked up
-            
+
             try:
                 o = all_occurrences.filter(start=start)[0]
                 if o.generated_by == self:
                     if not o.is_exclusion():
-                        unaccounted_for.discard(o)
+                        existing_but_not_regenerated.discard(o)
                 continue
             except IndexError:
                 # no occurrence exists yet.
@@ -226,15 +226,27 @@ class GeneratorModel(XTimespanModel):
             ).count():
                 continue            
 
-            #OK, we're good to go.
-            self.occurrences.create(event=self.event, start=start, _duration=self._duration)
+            #OK, we're good to create the occurrence.
+            o = self.occurrences.create(event=self.event, start=start, _duration=self._duration)
+#            print "created %s" % o
             #implied generated_by = self
     
-        # Finally, unhook any unaccounted_for occurrences
-        for o in unaccounted_for:
-            o.generated_by = None
-            o.save()
-    
+        # Finally, delete any unaccounted_for occurrences. If we can't delete, due to protection set by FKs to it, then
+        # unhook it instead.
+        for o in existing_but_not_regenerated:
+#            print "deleting %s" % o
+            o.delete()
+
+    def delete(self, *args, **kwargs):
+        """
+        If I am deleted, then cascade to my Occurrences, UNLESS there is is something FKed to them that is protecting them,
+        in which case the FK is set to NULL.
+        """
+        for o in self.occurrences.all():
+            o.delete()
+
+        super(GeneratorModel,self).delete(*args, **kwargs)
+
     def robot_description(self):
         r = "%s, repeating %s" % (
             pprint_datetime_span(self.start, self.end()),
