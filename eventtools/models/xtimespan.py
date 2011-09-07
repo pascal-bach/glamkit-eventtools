@@ -3,12 +3,61 @@ import datetime
 from django.db import models
 from django.utils.translation import ugettext as _
 from eventtools.utils import datetimeify
+from eventtools.utils.datetimeify import dayify
+from eventtools.utils.managertype import ManagerType
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
 from django.utils.safestring import mark_safe
+
+class XTimespanQSFN(object):
+    """
+    All the query functions are defined here, so they can be easily introspected
+    and injected by the OccurrenceManagerType metaclass.
+    """
+
+    def starts_before(self, date):
+        end = datetimeify(date, clamp="max")
+        return self.filter(start__lte=end)
+    def starts_after(self, date):
+        start = datetimeify(date, clamp="min")
+        return self.filter(start__gte=start)
+    def starts_between(self, d1, d2):
+        """
+        returns the occurrences that start in a given date/datetime range.
+        """
+        return self.starts_after(d1).starts_before(d2)
+
+    def starts_on(self, day):
+        d1, d2 = dayify(day)
+        return self.starts_between(d1, d2)
+
+    #defaults
+    before = starts_before
+    after = starts_after
+    between = starts_between
+    on = starts_on
+
+    #misc queries (note they assume starts_ and ends_)
+    def forthcoming(self):
+        return self.starts_after(date.today())
+
+    def recent(self):
+        return self.starts_before(date.today())
+
+class XTimespanQuerySet(models.query.QuerySet, XTimespanQSFN):
+    pass #all the goodness is inherited from XTimespanQSFN
+
+class XTimespanManager(models.Manager):
+    __metaclass__ = ManagerType(XTimespanQSFN)
+
+    def get_query_set(self):
+        return XTimespanQuerySet(self.model)
+
 
 class XTimespanModel(models.Model):
     start = models.DateTimeField(db_index=True)
     _duration = models.PositiveIntegerField(_("duration (mins)"), blank=True, null=True)
+
+    objects = XTimespanManager()
 
     class Meta:
         abstract = True
