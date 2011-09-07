@@ -6,7 +6,22 @@ instead use Occurrence.timespan.start etc.
 
 -------------------------------------------------------------------------------
 
+2011-09-06 -- Major backwards incompatibility:
+
+This revision contains a breaking change in the Occurrence and Generator models, to use start + duration, rather than
+start + end, and to have consistency between their APIs.
+
+The Generator model repeat_until is now a date, rather than a datetime, for simplicity (only one occurrence per day is
+generated).
+
+See UPGRADING.txt for sample code for migrations.
+
+
+-------------------------------------------------------------------------------
+
 2011-03-23 -- Possible backwards incompatibility:
+
+[EDIT 2011-09-06 - later changes now render this validation check obsolete]
 
 This revision introduces a validation check to ensure events marked as daily do
 not span more than 24 hours. If such events exist in your database, the 

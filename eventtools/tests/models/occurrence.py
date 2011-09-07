@@ -1,11 +1,10 @@
 # -*- coding: utf-8“ -*-
+from django.db import IntegrityError
 from django.test import TestCase
 from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
 from eventtools.tests.eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
-from eventtools.tests._fixture import bigfixture, reload_films
 from eventtools.utils import datetimeify
-from dateutil.relativedelta import relativedelta
 
 class TestOccurrences(AppTestCase):
     """
@@ -27,76 +26,72 @@ class TestOccurrences(AppTestCase):
         d1 = date(2010,1,1)
         d2 = date(2010,1,2)
         d1min = datetimeify(d1, clamp='min')
-        d1max = datetimeify(d1, clamp='max')
         d2min = datetimeify(d2, clamp='min')
-        d2max = datetimeify(d2, clamp='max')
         t1 = time(9,00)
         t2 = time(10,00) 
         dt1 = datetime.combine(d1, t1)
         dt2 = datetime.combine(d2, t2)
         
         #datetimes
-        o = e.occurrences.create(start=dt1, end=dt2)
+        o = e.occurrences.create(start=dt1, _duration=24*60+60)
         self.ae(o.start, dt1)
-        self.ae(o.end, dt2)
+        self.ae(o.end(), dt2)
         o.delete()
 
         o = e.occurrences.create(start=dt1)
         self.ae(o.start, dt1)
-        self.ae(o.end, dt1)
+        self.ae(o.end(), dt1)
         o.delete()
 
         o = e.occurrences.create(start=d1min)
         self.ae(o.start, d1min)
-        self.ae(o.end, d1max)
+        self.ae(o.end(), d1min)
         o.delete()
 
-        
-        #dates
-        o = e.occurrences.create(start=d1)
-        self.ae(o.start, d1min)
-        self.ae(o.end, d1max)
-        o.delete()
-
-        o = e.occurrences.create(start=d1, end=d2)
-        self.ae(o.start, d1min)
-        self.ae(o.end, d2max)
-        o.delete()
-
-        #combos
-        o = e.occurrences.create(start=dt1, end=d2)
-        self.ae(o.start, dt1)
-        self.ae(o.end, d2max)
-        o.delete()
-        
-        o = e.occurrences.create(start=d1, end=dt2)
-        self.ae(o.start, d1min)
-        self.ae(o.end, dt2)
-        o.delete()
-        
         #missing start date
-        self.assertRaises(TypeError, e.occurrences.create, **{'end':dt1})
-        self.assertRaises(TypeError, e.occurrences.create, **{'end':d1})
-        
+        self.assertRaises(Exception, e.occurrences.create, **{'_duration': 60})
+
         #invalid start value
-        self.assertRaises(TypeError, e.occurrences.create, **{'start':t1})
-        self.assertRaises(TypeError, e.occurrences.create, **{'start':t1, 'end':d1})
-        self.assertRaises(TypeError, e.occurrences.create, **{'start':t1, 'end':dt1})
+        self.assertRaises(Exception, e.occurrences.create, **{'start':t1})
+        self.assertRaises(Exception, e.occurrences.create, **{'start':t1, '_duration':60})
 
-        #invalid end values
-        self.assertRaises(TypeError, e.occurrences.create, **{'end':t1})
-        self.assertRaises(TypeError, e.occurrences.create, **{'start':d1, 'end':t1})
-        self.assertRaises(TypeError, e.occurrences.create, **{'start':dt1, 'end':t2})
-        
-        #start date later than end date
-        self.assertRaises(AttributeError, e.occurrences.create, **{'start':dt2, 'end':dt1})
-        self.assertRaises(AttributeError, e.occurrences.create, **{'start':d2, 'end':dt1})
-        self.assertRaises(AttributeError, e.occurrences.create, **{'start':d2, 'end':d1})
-    
-    def test_occurrence_properties(self):
+    def test_occurrence_duration(self):
+        e = ExampleEvent.eventobjects.create(title="event with occurrences")
+        d1 = date(2010,1,1)
+
+        # Occurrences with no duration have duration 0
+        o = e.occurrences.create(start=d1)
+        self.ae(o._duration, None)
+        self.ae(o.duration, timedelta(0))
+        o._duration = 0
+        self.ae(o.duration, timedelta(0))
+
+        # Occurrences with a given _duration in minutes have a corresponding timedelta duration property
+        o._duration = 60
+        self.ae(o.duration, timedelta(seconds=60*60))
+
+        # - even if it's more than a day
+        o._duration = 60 * 25
+        self.ae(o.duration, timedelta(days=1, seconds=60*60))
+
+        # Can set duration property with a timedelta
+        o.duration = timedelta(days=1, seconds=60*60)
+        self.ae(o._duration, 25 * 60)
+        self.ae(o.duration, timedelta(days=1, seconds=60*60))
+
+        # Can set duration property with a literal
+        o.duration = 25*60
+        self.ae(o._duration, 25 * 60)
+        self.ae(o.duration, timedelta(days=1, seconds=60*60))
+
+        # Can't have <0 duration
+        self.assertRaises(IntegrityError, e.occurrences.create, **{'_duration': -60})
+
+
+
+
+    def test_timespan_properties(self):
         """
-        Occurrences have a duration.
-
         Occurrences have a robot description.
         
         Occurrences that are currently taking place return true for now_on.
@@ -110,33 +105,26 @@ class TestOccurrences(AppTestCase):
         
         now = datetime.now()
         earlier = now - timedelta(seconds=600)
-        later = now + timedelta(seconds=600)
-        
+
         d1 = date(2010,1,1)
-        d2 = date(2010,1,2)
         t1 = time(9,00)
-        t2 = time(10,00)        
         dt1 = datetime.combine(d1, t1)
-        dt2 = datetime.combine(d2, t2)
         
-        o = e.occurrences.create(start=dt1, end=dt2)
-        o2 = e.occurrences.create(start=earlier, end=later)
+        o = e.occurrences.create(start=dt1, _duration=25*60)
+        o2 = e.occurrences.create(start=earlier, _duration = 20)
 
         self.ae(o.duration, timedelta(days=1, seconds=3600))
-        self.ae(o.relative_duration, relativedelta(days=1, hours=1))
         self.ae(o.timespan_description(), "1 January 2010, 9am until 10am on 2 January 2010")
 
-        self.ae(o.has_finished, True)
-        self.ae(o.has_started, True)
-        self.ae(o.now_on, False)
-        self.ae(o2.has_finished, False)
-        self.ae(o2.has_started, True)
-        self.ae(o2.now_on, True)
+        self.ae(o.has_finished(), True)
+        self.ae(o.has_started(), True)
+        self.ae(o.now_on(), False)
+        self.ae(o2.has_finished(), False)
+        self.ae(o2.has_started(), True)
+        self.ae(o2.now_on(), True)
 
         self.assertTrue(o.time_to_go() < timedelta(0))
-        self.ae(o2.time_to_go(), None)
-        self.assertTrue(o.relative_time_to_go().years < 0)
-        self.ae(o2.relative_time_to_go(), None)
+        self.ae(o2.time_to_go(), timedelta(0))
 
 """
 TODO

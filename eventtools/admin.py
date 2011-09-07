@@ -72,14 +72,14 @@ _convert_to_manual.short_description = "make occurrence manual (and create exclu
 
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
-        list_display = ['string_if_editable', 'start', 'end', 'event', 'is_automatic',]
+        list_display = ['string_if_editable', 'start', '_duration', 'is_automatic',]
         list_display_links = ['string_if_editable',]
         # list_display_filter = [IsGeneratedListFilter,] #when 1.4 comes...
         change_list_template = 'admin/eventtools/occurrence_list.html'
         formfield_overrides = {
             models.DateTimeField: {'form_class':DateAndMaybeTimeField},
         }
-        fields = ("event_edit_link", "start", "end", "generated_by")
+        fields = ("event_edit_link", "start", "_duration", "generated_by")
         exclude=("event",)
         readonly_fields = ('event_edit_link', 'generated_by')
         actions = [_remove_occurrences, _convert_to_manual]
@@ -163,23 +163,12 @@ def OccurrenceAdmin(OccurrenceModel):
                     self.admin_site.name,
                     OccurrenceModel._meta.app_label,
                     OccurrenceModel._meta.module_name), object_id)
-
-        def _get_event_ids(self, request):
-            # includes a little bit of caching
-            if hasattr(request, '_event'):
-                if not hasattr(request, '_event_ids'):
-                    descendants = request._event.get_descendants(include_self=True)
-                    request._event_ids = \
-                        descendants.values_list('id', flat=True)
-                return request._event_ids
-            return None
      
         def queryset(self, request):
-            # limit to occurrences of descendents of request._event, if set
-            queryset = super(_OccurrenceAdmin, self).queryset(request)
-            if self._get_event_ids(request):
-                queryset = queryset.filter(event__id__in=request._event_ids)
-            return queryset
+            qs = super(_OccurrenceAdmin, self).queryset(request)
+            if hasattr(request, '_event'):
+                return qs.filter(event=request._event)
+            return qs
      
         def get_actions(self, request):
             # remove 'delete' action
@@ -228,7 +217,9 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
         def occurrence_link(self, event):
             count = event.occurrences_count()
             url = self.occurrence_edit_url(event)
-            if count == 1:
+            if count == 0:
+                return 'No occurrences yet'
+            elif count == 1:
                 return '<a href="%s">View 1 Occurrence</a>' % (
                     url,
                 )
@@ -313,7 +304,7 @@ def OccurrenceInline(OccurrenceModel):
         model = OccurrenceModel
         formset = OccurrenceInlineFormSet
         extra = 1
-        fields = ('start', 'end',)        
+        fields = ('start', '_duration',)        
         formfield_overrides = {
             models.DateTimeField: {'form_class': DateAndMaybeTimeField},
         }        

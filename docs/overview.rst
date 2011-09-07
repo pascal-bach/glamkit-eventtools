@@ -23,9 +23,9 @@ This separation into three models allows us to do some very cool things:
 Event variations
 ----------------
 
-Organisations which organise events are familiar with the notion of some events  being special one-off variations of other events. For example, a monthly series of film screenings may have the same overall information every month, but different films. Or a film that shows every night in a month might have a directors' talk one night.
+Organisations which organise events are familiar with the notion of some events  being special one-off variations of other events. For example, a monthly series of film screenings may have the same overall information, but different films each month. Or a film that shows every night in a month might have a directors' talk one night.
 
-(Note: it might be tempting to use the tree arrangement for 'parent events' e.g. Festivals, and events which are part of the festival. In our experience, events and their 'parents' are rarely in a strict tree arrangement, so we use a many-to-many relation between a model which represents Events, and a model which represents parent, or rather umbrella, events. Depending on your arrangement, an umbrella event may be another Event, or another model entirely.)
+(Note: it might be tempting to use the tree arrangement for 'parent events' e.g. Festivals, and events which are part of the festival. In our experience, events and their 'parents' are rarely in a strict tree arrangement, so we use another many-to-many relation between a model which represents Events, and a model which represents parent events, or event series. Depending on your arrangement, an umbrella event may be another Event, or another model entirely.)
 
 In Eventtools, Event variations are modelled by arranging events in a tree, with 'template' events (with no occurrences) higher in the tree, and 'actual' events (with occurrences) lower in the tree.
 
@@ -41,9 +41,9 @@ An example arrangement might look like this:
             |---Romeo and Juliet
                 |---Romeo and Juliet with Director's talk
 
-Child events can automatically inherit some attributes from parent events.
+Variation events can automatically inherit some attributes from template events.
 
-To define inherited fierds, declare an EventMeta class in your Event model:
+To define inherited fields, declare an EventMeta class in your Event model:
 
     class Event(EventModel):
         ...

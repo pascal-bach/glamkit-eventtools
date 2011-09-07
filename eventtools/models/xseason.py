@@ -39,7 +39,7 @@ class SeasonManager(models.Manager):
         return SeasonQuerySet(self.model)
 
 
-class SeasonModel(models.Model):
+class XSeasonModel(models.Model):
     """
     Describes an entity which takes place between start and end dates. For
     example, a festival or exhibition.

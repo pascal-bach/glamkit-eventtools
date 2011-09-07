@@ -5,4 +5,4 @@ from .event import *
 from .occurrence import *
 from .generator import *
 from .exclusion import *
-from .season import *
+from .xseason import *

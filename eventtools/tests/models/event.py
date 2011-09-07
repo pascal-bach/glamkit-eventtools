@@ -26,30 +26,6 @@ class TestTestEvents(AppTestCase):
             self.assertTrue(o.start >= x)
             x= o.start
 
-        #test utils:
-        e = ExampleEvent.eventobjects.all()[0]
-        occ_count = e.occurrences.count()
-        e.occurrences.create(start=datetime.now())
-        self.ae(occ_count+1, e.occurrences.count())
-
-        #want to add just days too
-        o = e.occurrences.create(start=date.today())
-        self.ae(type(o.start), datetime)
-        self.ae(type(o.end), datetime)
-                
-        self.ae(occ_count+2, e.occurrences.count())
-        self.ae(o.start.time(), time.min)
-        self.ae(o.end.date(), date.today())
-        self.ae(o.end.time(), time.max)
-        o.delete()
-       
-        #and this way:
-        o = ExampleOccurrence.objects.create(event=e, start=date.today())
-        self.ae(o.start.time(), time.min)
-        self.ae(o.end.date(), date.today())
-        self.ae(o.end.time(), time.max)
-        o.delete()
-
     def test_occurrence_relation(self):
         """
         You can query the occurrences for a single event by date(datetime) range etc.
@@ -189,18 +165,6 @@ class TestTestEvents(AppTestCase):
         o2 = [a.closing_occurrence() for a in ExampleEvent.eventobjects.all()]
         self.ae(set(o), set(o2))
 
-        
-    def test_GET(self):
-        """        
-        a (GET) dictionary, containing date(time) from and to parameters can be passed.
-           ExampleEvent.eventobjects.filter(venue=the_library, cancelled=True).occurrences_from_GET_params(request.GET, 'from', 'to')
-        This returns a tuple of the parsed dates, too.
-        """
-        self.ae(list(ExampleOccurrence.objects.from_GET()[0]), list(ExampleOccurrence.objects.forthcoming()))        
-        self.ae(list(ExampleOccurrence.objects.from_GET({'startdate': '2010-10-10'})[0]), list(ExampleOccurrence.objects.after(self.day1)))
-        self.ae(list(ExampleOccurrence.objects.from_GET({'enddate': '2010-10-11'})[0]), list(ExampleOccurrence.objects.before(self.day2).reverse()))
-        self.ae(list(ExampleOccurrence.objects.from_GET({'startdate': '2010-10-10', 'enddate': '2010-10-11'})[0]), list(ExampleOccurrence.objects.between(self.day1, self.day2)))
-    
     def test_change_cascade(self):       
         """
         TestEvents are in an mptt tree, which indicates parents (more general) and children (more specific).

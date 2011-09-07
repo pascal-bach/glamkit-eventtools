@@ -1,6 +1,5 @@
 from datetime import date, time, datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from dateutil.tz import gettz
 from vobject.icalendar import utc
 
 from django.db import models
@@ -13,12 +12,10 @@ from django.db.models.base import ModelBase
 from django.template.defaultfilters import urlencode
 from django.utils.dateformat import format
 from django.utils.translation import ugettext as _
+from eventtools.models.xtimespan import XTimespanModel
 
 from eventtools.utils import datetimeify, dayify
-from eventtools.conf import settings
 from eventtools.utils import dateranges
-from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_time_span
-from eventtools.utils.domain import django_root_url
 
 
 class OccurrenceQuerySetFN(object):
@@ -335,7 +332,7 @@ class OccurrenceManager(models.Manager):
     def get_query_set(self): 
         return OccurrenceQuerySet(self.model)
 
-class OccurrenceModel(models.Model):
+class OccurrenceModel(XTimespanModel):
     """
     An abstract model for an event occurrence.
     
@@ -351,38 +348,13 @@ class OccurrenceModel(models.Model):
         generated_by = models.ForeignKey(SomeGenerator, blank=True, null=True,
             related_name="occurrences")
     """
-    
-    start = models.DateTimeField(db_index=True)
-    end = models.DateTimeField(blank=True, db_index=True)
-        
+
     objects = OccurrenceManager()
     
     class Meta:
         abstract = True
-        ordering = ('start', 'end',)
-        unique_together = ('event', 'start', )
-
-    def clean(self):
-        if self.end is None:
-            self.end = self.start
-        
-        if self.start > self.end:
-            raise ValidationError('start must be earlier than end')
-        super(OccurrenceModel, self).clean()
-
-    def save(self, *args, **kwargs):
-        if self.end is None:
-            self.end = self.start
-
-        self.start = datetimeify(self.start, clamp="min")
-        self.end = datetimeify(self.end, clamp="max")
-        if self.end.time == time.min:
-            self.end.time == time.max
-
-        if self.start > self.end:
-            raise AttributeError('start must be earlier than end')
-        
-        super(OccurrenceModel, self).save(*args, **kwargs)
+        ordering = ('start', 'event',)
+        unique_together = ('start', 'event',)
 
     def __unicode__(self):
         return u"%s: %s" % (self.event, self.timespan_description())
@@ -390,106 +362,14 @@ class OccurrenceModel(models.Model):
     @classmethod
     def EventModel(cls):
         return cls._meta.get_field('event').rel.to
-    
-    @property
-    def duration(self):
-        return self.end - self.start
-        
-    @property
-    def relative_duration(self):
-        return relativedelta(self.end, self.start)
 
-    @property
-    def all_day(self):
-        return self.start.time() == time.min and self.end.time() == time.max
-    
-    def timespan_description(self, html=False):
-        if html:
-            return mark_safe(pprint_datetime_span(self.start, self.end,
-                infer_all_day=False,
-                space="&nbsp;", 
-                date_range_str="&ndash;", 
-                time_range_str="&ndash;", 
-                separator=":", 
-                grand_range_str="&nbsp;&ndash;&nbsp;",
-            ))
-        return mark_safe(pprint_datetime_span(self.start, self.end, infer_all_day=False))
-
-    def html_timespan(self):
-        return self.timespan_description(html=True)
-        
-    def time_description(self, html=False):
-        if self.all_day:
-            return mark_safe(_("all day"))
-        
-        t1 = self.start.time()
-        if self.start.date() == self.end.date():
-            t2 = self.end.time()
-        else:
-            t2 = t1
-        
-        if html:
-            return mark_safe(pprint_time_span(t1, t2, range_str="&ndash;&#8203;"))
-        return pprint_time_span(t1, t2)
-        
-    def html_time_description(self):
-        return self.time_description(html=True)
-
-    @property
-    def has_finished(self):
-        return self.end < datetime.now()
-        
-    @property
-    def has_started(self):
-        return self.start < datetime.now()
-        
-    @property
-    def now_on(self):
-        return self.has_started and not self.has_finished
-    
     def is_exclusion(self):
         qs = self.event.exclusions.filter(start=self.start)
         if qs.count():
             return True
         return False
         
-    def time_to_go(self):
-        """
-        If self is in future, return + timedelta.
-        If self is in past, return - timedelta.
-        If self is now on, return None
-        """
-        if not self.has_started:
-            return self.start - datetime.now()
-        if self.has_finished:
-            return self.end - datetime.now()
-        return None
 
-    def relative_time_to_go(self):
-        """
-        If self is in future, return + timedelta.
-        If self is in past, return - timedelta.
-        If self is now on, return None
-        """
-        if not self.has_started:
-            return relativedelta(self.start, datetime.now())
-        if self.has_finished:
-            return relativedelta(self.end, datetime.now())
-        return None
-
-    def start_date(self):
-        return self.start.date()
-
-    def humanised_day(self):
-        if self.start.date() == date.today():
-            return _("Today")
-        elif self.start.date() == date.today() + timedelta(days=1):
-            return _("Tomorrow")
-        elif self.start.date() < date.today() + timedelta(days=7):
-            return format(self.start, "l")
-        else:
-            return format(self.start, "m d")
-    
     # ical is coming back soon.
     # def get_absolute_url(self):
     #     return self.event.get_absolute_url()

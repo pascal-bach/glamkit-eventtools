@@ -39,7 +39,7 @@ def fixture(obj):
     obj.weekly_talk = ExampleEvent.eventobjects.create(title="Weekly Talk", slug="weekly-talk")
     for day in range(50):
         d = date(2010,1,1) + timedelta(day*7)
-        obj.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
+        obj.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), _duration=240)
 
 
     #an event with some variations
@@ -67,13 +67,13 @@ def generator_fixture(obj):
     obj.yearly = Rule.objects.create(frequency = "YEARLY")
     obj.bin_night = ExampleEvent.eventobjects.create(title='Bin Night')
     
-    obj.weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+    obj.weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), _duration=60, rule=obj.weekly, repeat_until=date(2010,2,5))
     #this should create 0 occurrences, since it is a duplicate of weekly.
-    obj.dupe_weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+    obj.dupe_weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), _duration=60, rule=obj.weekly, repeat_until=date(2010,2,5))
 
-    obj.endless_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,2,10,30), event_end=datetime(2010,1,2,11,30), rule=obj.weekly)
+    obj.endless_generator = obj.bin_night.generators.create(start=datetime(2010,1,2,10,30), _duration=60, rule=obj.weekly)
 
-    obj.all_day_generator = obj.bin_night.generators.create(event_start=date(2010,1,4), rule=obj.weekly, repeat_until=date(2010,1,25))
+    obj.all_day_generator = obj.bin_night.generators.create(start=datetime(2010,1,4,0,0), rule=obj.weekly, repeat_until=date(2010,1,25))
     
 def reload_films(obj):
     obj.film = obj.film.reload()

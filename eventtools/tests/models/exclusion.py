@@ -113,7 +113,7 @@ class TestExclusions(AppTestCase):
         )
 
         #update start time
-        self.weekly_generator.event_start=datetime(2010,1,1,11,00)
+        self.weekly_generator.start=datetime(2010,1,1,11,00)
         self.weekly_generator.save()
         
         self.assertTrue(
