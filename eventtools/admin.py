@@ -2,6 +2,7 @@ import datetime
 
 import django
 from django import forms
+from django.conf import settings
 from django.conf.urls.defaults import patterns, url
 from django.contrib import admin, messages
 from django.core import validators
@@ -13,46 +14,24 @@ from django.shortcuts import get_object_or_404, redirect
 from django.forms.models import BaseInlineFormSet
 from mptt.forms import TreeNodeChoiceField
 from mptt.admin import MPTTModelAdmin
+from django.utils.translation import ugettext, ugettext_lazy as _
 
 from utils.diff import generate_diff
 
 from .models import Rule
 # from .filters import IsGeneratedListFilter #needs django 1.4
+MPTT_ADMIN_LEVEL_INDENT = getattr(settings, 'MPTT_ADMIN_LEVEL_INDENT', 10)
 
 
-class DateAndMaybeTimeField(forms.SplitDateTimeField):
-    """
-    Allow blank time; default to 00:00:00:00 / 11:59:59:99999 (based on field label) 
-    These times are time.min and time.max, by the way.
-    """
-
-    widget = admin.widgets.AdminSplitDateTime
-    
-    def clean(self, value):
-        """ Override to make the TimeField not required. """
-        try:
-            return super(DateAndMaybeTimeField, self).clean(value)
-        except ValidationError, error:
-            if error.messages == [self.error_messages['required']]:
-                if value[0] not in validators.EMPTY_VALUES:
-                    out = self.compress([self.fields[0].clean(value[0]), None])
-                    self.validate(out)
-                    return out
-            raise
-                    
-    def compress(self, data_list):
-        if data_list:
-            if data_list[0] in validators.EMPTY_VALUES:
-                raise ValidationError(self.error_messages['invalid_date'])
-            if data_list[1] in validators.EMPTY_VALUES:
-                if self.label.lower().count('end'):
-                    data_list[1] = datetime.time.max
-                else:
-                    data_list[1] = datetime.time.min
-            return datetime.datetime.combine(*data_list)
-        return None
+class TreeModelChoiceField(forms.ModelChoiceField):
+    """ ModelChoiceField which displays depth of objects within MPTT tree. """
+    def label_from_instance(self, obj):
+        super_label = \
+            super(TreeModelChoiceField, self).label_from_instance(obj)
+        return u"%s%s" % ("-"*obj.level, super_label)
 
 
+# ADMIN ACTIONS
 def _remove_occurrences(modeladmin, request, queryset):
     for m in queryset:
         # if the occurrence was generated, then add it as an exclusion.
@@ -74,19 +53,36 @@ def _convert_to_manual(modeladmin, request, queryset):
     queryset.update(generated_by=None)
 _convert_to_manual.short_description = "make occurrence manual (and create exclusions)"
 
+class OccurrenceAdminForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(OccurrenceAdminForm, self).__init__(*args, **kwargs)
+        EventModel = self.instance.EventModel()
+        self.fields['event'] = TreeModelChoiceField(EventModel.objects)
+
+        event = self.instance.event
+        if event:
+            if self.instance.generated_by:
+                #generated_by events are limited to children of the generator event
+                #(otherwise syncing breaks). TODO: make syncing look at ancestors as well?
+                self.fields['event'].queryset = self.instance.generated_by.event.get_descendants(include_self=True)
+            else:
+                self.fields['event'].queryset = \
+                    event.get_descendants(include_self = True) | \
+                    event.get_ancestors() | \
+                    event.get_siblings()
+
+
 
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
-        list_display = ['string_if_editable', 'start', '_duration', 'is_automatic',]
+        form = OccurrenceAdminForm
+        list_display = ['event', 'string_if_editable', 'start', '_duration', 'is_automatic',]
         list_display_links = ['string_if_editable',]
+        list_editable = ['event']
         # list_filter = [IsGeneratedListFilter,] #when 1.4 comes...
         change_list_template = 'admin/eventtools/occurrence_list.html'
-        formfield_overrides = {
-            models.DateTimeField: {'form_class':DateAndMaybeTimeField},
-        }
-        fields = ("event_edit_link", "start", "_duration", "generated_by")
-        exclude=("event",)
-        readonly_fields = ('event_edit_link', 'generated_by')
+        fields = ("event" , "start", "_duration", "generated_by")
+        readonly_fields = ('generated_by', )
         actions = [_remove_occurrences, _wipe_occurrences, _convert_to_manual]
         date_hierarchy = 'start'
         
@@ -98,8 +94,12 @@ def OccurrenceAdmin(OccurrenceModel):
             if occurrence.generated_by is not None:
                 return "" #can't click on an empty link
             else:
-                return "Edit"
+                return "Edit directly"
         string_if_editable.short_description = "edit manual occurrences"
+
+        def get_changelist_form(self, request, **kwargs):
+            kwargs.setdefault('form', OccurrenceAdminForm)
+            return super(_OccurrenceAdmin, self).get_changelist_form(request, **kwargs)
 
         def event_edit_url(self, event):
             return reverse(
@@ -110,12 +110,12 @@ def OccurrenceAdmin(OccurrenceModel):
                 args=(event.id,)
             )
   
-        def event_edit_link(self, occurrence):
-            return "<a href=\"%s\">%s</a>" % (
-                self.event_edit_url(occurrence.event), occurrence.event
-            )
-        event_edit_link.allow_tags = True
-        event_edit_link.short_description = "Event"
+#        def event_edit_link(self, occurrence):
+#            return "<a href=\"%s\">%s</a>" % (
+#                self.event_edit_url(occurrence.event), occurrence.event
+#            )
+#        event_edit_link.allow_tags = True
+#        event_edit_link.short_description = "Event"
   
         def is_automatic(self, occurrence):
             return occurrence.generated_by is not None
@@ -170,9 +170,10 @@ def OccurrenceAdmin(OccurrenceModel):
                     OccurrenceModel._meta.module_name), object_id)
      
         def queryset(self, request):
-            qs = super(_OccurrenceAdmin, self).queryset(request)
             if hasattr(request, '_event'):
-                return qs.filter(event=request._event)
+                return request._event.occurrences_in_listing()
+            else:
+                qs = super(_OccurrenceAdmin, self).queryset(request)
             return qs
      
         def get_actions(self, request):
@@ -197,7 +198,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
     
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
-        list_display = ['title', 'listed_under', 'occurrence_link', 'season'] # leave as list to allow extension
+        list_display = ['title_bold_if_listed', 'occurrence_link', 'season'] # leave as list to allow extension
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}
@@ -210,7 +211,20 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
         def __init__(self, *args, **kwargs):
             super(_EventAdmin, self).__init__(*args, **kwargs)
             self.occurrence_model = EventModel.OccurrenceModel()
-                
+
+        def title_bold_if_listed(self, obj):
+            if obj.is_listed():
+                result = "<span style='font-weight:bold;padding-left:%spx'>%s</span>"
+            else:
+                result = "<span style='font-weight:normal;padding-left:%spx'>%s</span>"
+
+            return result % (
+                (5 + MPTT_ADMIN_LEVEL_INDENT * obj.level),
+                obj.title,
+            )
+        title_bold_if_listed.allow_tags = True
+        title_bold_if_listed.short_description = _("title (items in bold will be listed; other items are templates or variations)")
+
         def occurrence_edit_url(self, event):
             return reverse("%s:%s_%s_changelist_for_event" % (
                         self.admin_site.name,
@@ -220,20 +234,21 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 )
                 
         def occurrence_link(self, event):
-            count = event.occurrences.count()
+            count = event.occurrences_in_listing().count()
+            direct_count = event.occurrences.count()
+
             url = self.occurrence_edit_url(event)
-            if count == 0:
+            if not count:
                 return 'No occurrences yet'
             elif count == 1:
-                return '<a href="%s">View 1 Occurrence</a>' % (
-                    url,
-                )
+                r = '<a href="%s">1 Occurrence</a>' % url
             else:
-                return '<a href="%s">View all %s Occurrences</a>' % (
+                r = '<a href="%s">%s Occurrences</a>' % (
                     url,
                     count,
                 )
-        occurrence_link.short_description = 'Occurrences'
+            return r + ' (%s direct)' % direct_count
+        occurrence_link.short_description = 'Edit Occurrences'
         occurrence_link.allow_tags = True
 
         def get_urls(self):
@@ -310,9 +325,6 @@ def OccurrenceInline(OccurrenceModel):
         formset = OccurrenceInlineFormSet
         extra = 1
         fields = ('start', '_duration',)        
-        formfield_overrides = {
-            models.DateTimeField: {'form_class': DateAndMaybeTimeField},
-        }        
     return _OccurrenceInline
 
 def ExclusionInline(ExclusionModel):
@@ -320,18 +332,12 @@ def ExclusionInline(ExclusionModel):
         model = ExclusionModel
         extra = 0
         fields = ('start',)        
-        formfield_overrides = {
-            models.DateTimeField: {'form_class': DateAndMaybeTimeField},
-        }        
     return _ExclusionInline
 
 def GeneratorInline(GeneratorModel):
     class _GeneratorInline(admin.TabularInline):
         model = GeneratorModel
         extra = 0
-        formfield_overrides = {
-            models.DateTimeField: {'form_class': DateAndMaybeTimeField},
-        }        
     return _GeneratorInline
     
 admin.site.register(Rule)

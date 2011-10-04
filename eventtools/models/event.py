@@ -332,6 +332,10 @@ class EventModel(MPTTModel):
                 return self
         return None
 
+    def is_listed(self):
+        return self.listed_under() == self
+    is_listed.boolean = True
+
     def season(self):
         """
         Returns a string describing the first and last dates of this event.
