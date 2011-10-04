@@ -94,7 +94,7 @@ Views and URLs
     from eventtools.views import EventViews
     from .models import Event
 
-    views = EventViews(event_qs=Event.eventobjects.all())
+    views = EventViews(event_qs=Event.eventobjects.in_listings())
 
     urlpatterns = patterns('',
         url(r'^', include(views.urls)),

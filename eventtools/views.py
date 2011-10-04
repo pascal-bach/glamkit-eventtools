@@ -15,7 +15,11 @@ import datetime
 
 class EventViews(object):
 
-# Have currently disabled icals.
+    # Have currently disabled icals.
+
+    """
+    use Event.eventobjects.in_listings() as a first blush at event_qs.
+    """
 
     def __init__(self, event_qs, occurrence_qs=None):
         self.event_qs = event_qs
