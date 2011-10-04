@@ -197,7 +197,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
     
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
-        list_display = ['title', 'occurrence_link', 'season'] # leave as list to allow extension
+        list_display = ['title', 'listed_under', 'occurrence_link', 'season'] # leave as list to allow extension
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}
@@ -220,7 +220,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 )
                 
         def occurrence_link(self, event):
-            count = event.occurrences_count()
+            count = event.occurrences.count()
             url = self.occurrence_edit_url(event)
             if count == 0:
                 return 'No occurrences yet'

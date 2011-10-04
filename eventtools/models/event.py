@@ -6,16 +6,13 @@ from django.db.models.fields import FieldDoesNotExist
 from django.db.models import Count
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext, ugettext_lazy as _
-from django.template.defaultfilters import urlencode
+from django.template.defaultfilters import urlencode, slugify
 
 from mptt.models import MPTTModel, MPTTModelBase
 from mptt.managers import TreeManager
 
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
-from eventtools.utils.pprint_timespan \
-    import pprint_datetime_span, pprint_date_span
-from eventtools.utils.dateranges import DateTester
-from eventtools.utils.domain import django_root_url
+from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
 
 class EventQuerySet(models.query.QuerySet):
     # much as you may be tempted to add "starts_between" and other
@@ -23,15 +20,47 @@ class EventQuerySet(models.query.QuerySet):
     # performance). Instead, use OccurrenceQuerySet.starts_between().events().
     # We have to relax this for opening and closing occurrences, as they're 
     # relevant to a particular event.
-    
-    def occurrences(self, *args, **kwargs):
+
+    def in_listings(self):
+        """
+        Returns the events that should be in listings, namely, the top
+        events in the tree that have occurrences attached.
+
+        Event.objects.in_listings() is the (minimum) set of events for which
+        occurrences_in_listing() for these events will return the entire
+        Occurrence set, with no repetitions or overlaps. ie, this is probably
+        what you want to show in listings.
+
+        Given that the tree is likely to be quite shallow, let's do this breadth-first.
+
+        For each level:
+        * two filter: 1) children of qs having_occurrences and 2) children of qs having_no_occurrences.
+        * 1) is added to result set.
+        * 2) is used as qs for next level
+
+        TODO: For subqueries, this will produce results that are not in the
+        superqueries, because we don't have access to potential missing parents.
+        Maybe this is desired behaviour?
+        """
+        max_level = self.aggregate(models.Max('level'))['level__max']
+
+        result = self.filter(level=0).having_occurrences()
+        qs = self.filter(level=0).having_no_occurrences()
+
+        for level in range(1, max_level+1):
+            if qs:
+                result |= self.filter(parent__in=qs).having_occurrences()
+                qs = self.filter(parent__in=qs).having_no_occurrences()
+
+        return result
+
+    def occurrences(self):
         """
         Returns the occurrences for events in this queryset. NB that only
         occurrences attached directly to events, ie not child events, are returned.
         """
         return self.model.OccurrenceModel().objects\
-            .filter(event__in=self)\
-            .filter(*args, **kwargs)
+            .filter(event__in=self)
                 
     def opening_occurrences(self):
         """
@@ -43,7 +72,7 @@ class EventQuerySet(models.query.QuerySet):
                 pks.append(e.opening_occurrence().id)
             except AttributeError:
                 pass
-        return self.occurrences(pk__in=pks)
+        return self.occurrences().filter(pk__in=pks)
         
     def closing_occurrences(self):
         """
@@ -55,7 +84,7 @@ class EventQuerySet(models.query.QuerySet):
                 pks.append(e.closing_occurrence().id)
             except AttributeError:
                 pass
-        return self.occurrences(pk__in=pks)
+        return self.occurrences().filter(pk__in=pks)
                 
     #some simple annotations
     def having_occurrences(self):
@@ -75,7 +104,10 @@ class EventTreeManager(TreeManager):
     def get_query_set(self): 
         return EventQuerySet(self.model).order_by(
             self.tree_id_attr, self.left_attr)
-        
+
+    def in_listings(self):
+        return self.get_query_set().in_listings()
+
     def occurrences(self, *args, **kwargs):
         return self.get_query_set().occurrences(*args, **kwargs)
 
@@ -171,6 +203,7 @@ class EventModel(MPTTModel):
     __metaclass__ = EventModelBase
     
     parent = models.ForeignKey('self', null=True, blank=True, related_name='children')
+    # 'parent' is more flexible than 'template'.
     title = models.CharField(max_length=255)
     slug = models.SlugField("URL name", unique=True, help_text="This is used in\
      the event's URL, and should be unique and unchanging.")
@@ -220,6 +253,9 @@ class EventModel(MPTTModel):
         """
         #this has to happen before super.save, so that we can tell what's
         #changed
+        if not self.slug:
+            self.slug = slugify(self.title)
+
         self._cascade_changes_to_children()
         r = super(EventModel, self).save(*args, **kwargs)
 
@@ -252,20 +288,29 @@ class EventModel(MPTTModel):
                     except AttributeError:
                         continue
                 child.save() #cascades to grandchildren
-    
-    def occurrences_count(self):
-        """needed by admin"""
-        return self.occurrences.count()
-        
+
+    def occurrences_in_listing(self):
+        """
+        The occurrences_in_listing set is the occurrences that are 'relevant' to
+        this event, by dint of being directly attached, or attached to one of its
+        children.
+
+        Event.objects.in_listings() is the (minimum) set of events for which
+        occurrences_in_listing() for these events will return the entire
+        Occurrence set, with no repetitions or overlaps. ie, this is probably
+        what you want to show in listings.
+        """
+        return self.get_descendants(include_self=True).occurrences()
+
     def opening_occurrence(self):
         try:
-            return self.occurrences.all()[0]
+            return self.occurrences_in_listing().all()[0]
         except IndexError:
             return None
         
     def closing_occurrence(self):
         try:
-            return self.occurrences.all().reverse()[0]
+            return self.occurrences_in_listing().all().reverse()[0]
         except IndexError:
             return None
 
@@ -275,7 +320,18 @@ class EventModel(MPTTModel):
     def has_finished(self):
         """ the event has finished if the closing occurrence has finished. """
         return self.closing_occurrence().has_finished
-                        
+
+    def listed_under(self):
+        """
+        This event is listed under the highest ancestor that has Occurrences directly attached.
+        """
+        try:
+            return self.get_ancestors().having_occurrences().order_by('level')[0]
+        except (IndexError, AttributeError):
+            if self.occurrences.count():
+                return self
+        return None
+
     def season(self):
         """
         Returns a string describing the first and last dates of this event.

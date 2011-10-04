@@ -5,14 +5,9 @@ from eventtools.utils.dateranges import *
 from datetime import datetime, date, timedelta
 
 def fixture(obj):
-    obj.gallery = ExampleVenue.objects.create(name="Gallery A", slug="gallery-A")
-    obj.auditorium = ExampleVenue.objects.create(name="Auditorium", slug="auditorium")
-    obj.cinema_1 = ExampleVenue.objects.create(name="Cinema 1", slug="cinema-1")
-    obj.cinema_2 = ExampleVenue.objects.create(name="Cinema 2", slug="cinema-2")
-    
     #some simple events
-    obj.talk = ExampleEvent.eventobjects.create(title="Curator's Talk", slug="curators-talk", venue=obj.gallery)
-    obj.performance = ExampleEvent.eventobjects.create(title="A performance", slug="performance", venue=obj.auditorium)
+    obj.talk = ExampleEvent.eventobjects.create(title="Curator's Talk", slug="curators-talk")
+    obj.performance = ExampleEvent.eventobjects.create(title="A performance", slug="performance")
     
     #some useful dates
     obj.day1 = date(2010,10,10)
@@ -43,10 +38,10 @@ def fixture(obj):
 
 
     #an event with some variations
-    obj.film = ExampleEvent.eventobjects.create(title="Film Night", slug="film-night", venue=obj.cinema_1)
-    obj.film_with_popcorn = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-2", difference_from_parent="free popcorn", venue=obj.cinema_1)
-    obj.film_with_talk = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-talk", difference_from_parent="director's talk", venue=obj.auditorium)
-    obj.film_with_talk_and_popcorn = ExampleEvent.eventobjects.create(parent=obj.film_with_talk, title="Film Night", slug="film-with-talk-and-popcorn", difference_from_parent="popcorn and director's talk", venue=obj.cinema_2)
+    obj.film = ExampleEvent.eventobjects.create(title="Film Night", slug="film-night")
+    obj.film_with_popcorn = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-2", difference_from_parent="free popcorn")
+    obj.film_with_talk = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-talk", difference_from_parent="director's talk")
+    obj.film_with_talk_and_popcorn = ExampleEvent.eventobjects.create(parent=obj.film_with_talk, title="Film Night", slug="film-with-talk-and-popcorn", difference_from_parent="popcorn and director's talk")
     
     # obj.film_with_popcorn.move_to(obj.film, position='first-child')
     # obj.film_with_talk.move_to(obj.film, position='first-child')

@@ -4,14 +4,17 @@ from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
 from eventtools.tests.eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
 from eventtools.tests._fixture import generator_fixture
-from eventtools.utils import datetimeify
-from dateutil.relativedelta import relativedelta
+from eventtools.tests._fixture import fixture
 from django.core.urlresolvers import reverse
 from eventtools.models import Rule
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 class TestExclusions(AppTestCase):
+
+    def setUp(self):
+        super(TestExclusions, self).setUp()
+        fixture(self)
 
     def test_generation_then_exclusion(self):
         """

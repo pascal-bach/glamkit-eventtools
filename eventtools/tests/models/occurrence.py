@@ -1,6 +1,7 @@
 # -*- coding: utf-8“ -*-
 from django.db import IntegrityError
 from django.test import TestCase
+from eventtools.tests._fixture import fixture
 from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
 from eventtools.tests.eventtools_testapp.models import *
 from datetime import date, time, datetime, timedelta
@@ -20,6 +21,10 @@ class TestOccurrences(AppTestCase):
 
     End datetime must be >= start datetime.
     """
+    def setUp(self):
+        super(TestOccurrences, self).setUp()
+        fixture(self)
+
     def test_occurrence_create(self):
         e = ExampleEvent.eventobjects.create(title="event with occurrences")
         

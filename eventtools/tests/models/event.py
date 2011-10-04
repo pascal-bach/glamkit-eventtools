@@ -1,12 +1,17 @@
 from django.test import TestCase
 from eventtools.tests._inject_app import TestCaseWithApp as AppTestCase
 from eventtools.tests.eventtools_testapp.models import *
+from eventtools.tests._fixture import fixture
 from datetime import date, time, datetime, timedelta
 from eventtools.tests._fixture import bigfixture, reload_films
 from eventtools.utils import dateranges
 
-class TestTestEvents(AppTestCase):
-    
+class TestEvents(AppTestCase):
+
+    def setUp(self):
+        super(TestEvents, self).setUp()
+        fixture(self)
+
     def test_creation(self):
 
         """
@@ -76,23 +81,7 @@ class TestTestEvents(AppTestCase):
         """
         all_occs = ExampleEvent.eventobjects.occurrences()
         self.ae(list(all_occs), list(ExampleOccurrence.objects.all()))
-       
-        gallery_occs = ExampleEvent.eventobjects.filter(venue=self.gallery).occurrences()
-        self.ae(len(gallery_occs), 3)
-        self.assertTrue(self.talk_morning in gallery_occs)
-        self.assertTrue(self.talk_afternoon in gallery_occs)
-        self.assertTrue(self.talk_tomorrow_morning_cancelled in gallery_occs)
-        
-        #two similar syntaxes
-        cancelled_gallery_occs1 = ExampleEvent.eventobjects.filter(venue=self.gallery).occurrences(status='cancelled')
-        cancelled_gallery_occs2 = ExampleEvent.eventobjects.filter(venue=self.gallery).occurrences().filter(status='cancelled')
-        self.ae(list(cancelled_gallery_occs1), list(cancelled_gallery_occs2))
-        self.ae(list(cancelled_gallery_occs2), [self.talk_tomorrow_morning_cancelled])
-        
-        # just checking a queryset is returned and can be further refined
-        gallery_occs = ExampleEvent.eventobjects.filter(venue=self.gallery).occurrences().after(self.day2)
-        self.ae(list(gallery_occs), [self.talk_tomorrow_morning_cancelled])
-        
+
         #opening and closing
         self.ae(self.performance.opening_occurrence(), self.performance_evening)
         self.ae(self.performance.closing_occurrence(), self.performance_day_after_tomorrow)

@@ -36,8 +36,7 @@ class TestCaseWithApp(TestCase):
             self._refresh_cache()
         except ValueError:
                 pass
-        fixture(self)
-        
+
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_INSTALLED_APPS
         settings.ROOT_URLCONF = self._old_root_urlconf
