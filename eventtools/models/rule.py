@@ -1,6 +1,8 @@
+import calendar
 from django.db import models
 from django.utils.translation import ugettext, ugettext_lazy as _
 from dateutil import rrule
+from dateutil.relativedelta import weekdays
 
 freqs = (
     ("YEARLY", _("Yearly")),
@@ -89,8 +91,25 @@ class Rule(models.Model):
     
     def get_rrule(self, dtstart):
         if self.complex_rule:
+            d = dtstart.date()
+            weekday = weekdays[d.weekday()]
+            n = 1 + (d.day / 7)
+
+            start_day, days_in_month = calendar.monthrange(d.year, d.month)
+            days_from_end = days_in_month - d.day
+
+            minus_n = -1 - (days_from_end / 7)
+            cr = self.complex_rule \
+                .replace("%date%", dtstart.strftime("%Y%m%d")) \
+                .replace("%day%", dtstart.strftime("%d")) \
+                .replace("%month%", dtstart.strftime("%m")) \
+                .replace("%year%", dtstart.strftime("%Y")) \
+                .replace("%time%", dtstart.strftime("%H%M%S")) \
+                .replace("%datetime%", dtstart.strftime("%Y%m%dT%H%M%S")) \
+                .replace("%nthday%", "%s%s" % (n, weekday)) \
+                .replace("%-nthday%", "%s%s" % (minus_n, weekday))
             try:
-                return rrule.rrulestr(str(self.complex_rule), dtstart=dtstart)
+                return rrule.rrulestr(str(cr), dtstart=dtstart)
             except: #Except what?
                 pass
         params = self.get_params()
