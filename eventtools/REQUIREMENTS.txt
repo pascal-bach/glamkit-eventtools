@@ -1,5 +1,4 @@
-django-mptt==0.4.2
-
+-e git://github.com/django-mptt/django-mptt.git@384b1#egg=mptt
 # need to use python-dateutil <2.x for python2.x
 python-dateutil==1.5
 vobject==0.8.1c

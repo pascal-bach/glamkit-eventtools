@@ -32,13 +32,19 @@ background:#BBFFBB none repeat scroll 0 0;
 
 /* hide inlines text */
 #occurrences-group td.original p,
+#exclusions-group td.original p,
 #generators-group td.original p {
 	display: none;
 }
 
 #occurrences-group tr.has_original td,
+#exclusions-group tr.has_original td,
 #generators-group tr.has_original td {
 	padding-top: 0;
+}
+
+#occurrences-group h2:before {
+	content:"One-off ";
 }
 
 </style>
@@ -50,7 +56,7 @@ background:#BBFFBB none repeat scroll 0 0;
   {{ block.super }}
   {% if original and object.id %}
     <li><a href="create_variation/">Create a variation of this event</a></li>
-		<li><a href="{{ occurrence_edit_url }}">View all occurrences ({{ object.occurrences.count }})</a></li>
+		<li><a href="{{ occurrence_edit_url }}">View child occurrences ({{ object.occurrences_in_listing.count }})</a></li>
   {% endif %}
 {% endblock %}
 
@@ -72,7 +78,7 @@ background:#BBFFBB none repeat scroll 0 0;
 				 {% endfor %}	
 			
 				{% if fields_diff %}
-					<h2>Differences from parent</h2>
+				<h2>Changes in inherited fields</h2>
 					{% for field in fields_diff %}
 						<div class="form-row {{ field.label }}">
 							<div>

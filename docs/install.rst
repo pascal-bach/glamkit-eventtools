@@ -82,7 +82,7 @@ Admin
     from eventtools.admin import EventAdmin, OccurrenceAdmin
     from .models import Event, Occurrence
 
-    admin.site.register(Event, EventAdmin(Event))
+    admin.site.register(Event, EventAdmin(Event), show_exclusions=True)
     admin.site.register(Occurrence, OccurrenceAdmin(Occurrence))
 
 Views and URLs
@@ -94,7 +94,7 @@ Views and URLs
     from eventtools.views import EventViews
     from .models import Event
 
-    views = EventViews(event_qs=Event.eventobjects.in_listings())
+    views = EventViews(event_qs=Event.eventobjects.all())
 
     urlpatterns = patterns('',
         url(r'^', include(views.urls)),

@@ -523,11 +523,11 @@ class TestGenerators(AppTestCase):
         # that means there are 26 occurrences generated
         self.ae(generator.occurrences.count(), 26)
 
-        # since I bought a ticket, the occurrence that has a ticket is now manual
+        # since I bought a ticket, the occurrence that has a ticket is now one-off
         self.assertTrue(ticket.occurrence)
         self.ae(event.occurrences.get(id=ticket.occurrence.id).generated_by, None)
 
-        # but there are no other manual occurrences, meaning 27 occurrences in total
+        # but there are no other one-off occurrences, meaning 27 occurrences in total
         self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
         self.ae(event.occurrences.count(), 27)
 
@@ -546,12 +546,12 @@ class TestGenerators(AppTestCase):
         # oh wait, I made a data entry mistake! Deleting the generator.
         generator.delete()
 
-        # since I bought a ticket, the occurrence that has a ticket is now manual.
+        # since I bought a ticket, the occurrence that has a ticket is now one-off.
         ticket = ExampleTicket.objects.get(pk=ticket.pk)
         self.assertTrue(ticket.occurrence)
         self.ae(ticket.occurrence.generated_by, None)
 
-        # but there are no other manual occurrences, meaning 1 occurrence in total
+        # but there are no other one-off occurrences, meaning 1 occurrence in total
         self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
         self.ae(event.occurrences.count(), 1)
 

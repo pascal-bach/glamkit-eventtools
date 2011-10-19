@@ -1,0 +1,9 @@
+<dl class="sessions">
+	{% regroup occurrences by start_date as day_list %}
+	{% for day in day_list %}
+		<dt data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ day.grouper|date:"l, j F Y" }}</dt>
+		{% for occurrence in day.list %}
+			<dd data="{{ day.grouper|date:"Y-m-d" }}" class="hide">{{ occurrence.html_time_description }}{% if occurrence.event != event %}: <a href="{{ occurrence.event.get_absolute_url }}">{{ occurrence.event }}</a>{% endif %} {% if occurrence.status_message %}&ndash; {{ occurrence.status_message }}{% endif %}</dd>
+		{% endfor %}
+	{% endfor %}
+</dl>

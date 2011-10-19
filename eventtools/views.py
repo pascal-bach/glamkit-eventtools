@@ -18,13 +18,16 @@ class EventViews(object):
     # Have currently disabled icals.
 
     """
-    use Event.eventobjects.in_listings() as a first blush at event_qs.
+    use Event.eventobjects.all() for event_qs.
+
+    It will get filtered to .in_listings() where appropriate.
     """
 
     def __init__(self, event_qs, occurrence_qs=None):
         self.event_qs = event_qs
+
         if occurrence_qs is None:
-            occurrence_qs = event_qs.occurrences()
+            occurrence_qs = self.event_qs.occurrences()
         self.occurrence_qs = occurrence_qs
 
     @property

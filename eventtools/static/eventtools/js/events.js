@@ -30,7 +30,7 @@
 			$("#sessions dd").hide();
 
 			//inject an info/results box
-			$("#sessions h2").after("<p class='help'>Click on calendar to see session times</p>");
+			$("#sessions").prepend("<p class='help'>Click on calendar to see session times</p>");
 		
 			// Make highlighted dates look clickable
 			$(".calendar td.highlight").css("cursor", "pointer");

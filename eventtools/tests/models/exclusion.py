@@ -20,7 +20,7 @@ class TestExclusions(AppTestCase):
         """
         If an Exclusion is saved, then:
         
-        * Generated Occurrences that should be excluded are converted to manual.
+        * Generated Occurrences that should be excluded are converted to one-off.
         * Re-generating from generators will not re-generate that occurrence.
         """
 
@@ -39,7 +39,7 @@ class TestExclusions(AppTestCase):
         )
         
         # Assert that the clashing occurrence has the same ID, but
-        # now has no generator (ie is manual)
+        # now has no generator (ie is one-off)
         self.existing_occurrence = self.bin_night.occurrences.get(start = clashingtime)
         self.ae(self.existing_occurrence_id, self.existing_occurrence.id)
         self.assertTrue(self.existing_occurrence.generated_by is None)
@@ -56,10 +56,10 @@ class TestExclusions(AppTestCase):
 
     def test_clash(self):
         """
-        If we create a manual occurrence that clashes
+        If we create a one-off occurrence that clashes
             * event + start-time is unique, so it must be added as an exception
             first.
-            * the manual occurrence shouldn't be generated.
+            * the one-off occurrence shouldn't be generated.
         """
         
         generator_fixture(self)
@@ -83,25 +83,25 @@ class TestExclusions(AppTestCase):
         )
 
         # now we should have a manual occurrence
-        manual_occ = self.bin_night.occurrences.get(start = clashingtime)
-        self.assertTrue(manual_occ.generated_by is None)
+        oneoff_occ = self.bin_night.occurrences.get(start = clashingtime)
+        self.assertTrue(oneoff_occ.generated_by is None)
         
         # let's delete it:
-        manual_occ.delete()
+        oneoff_occ.delete()
         
-        # and now it's OK to create a manual one:
+        # and now it's OK to create a one-off one:
         self.bin_night.occurrences.create(start=clashingtime)
         
         # and if we remove the Exclusion, the generators don't try to generate
-        # anything clashing with the manual occurrence
+        # anything clashing with the one-off occurrence
         self.exclusion.delete()
         
         self.weekly_generator.save()
         self.endless_generator.save()
         
-        manual_occs = self.bin_night.occurrences.filter(start = clashingtime)
-        self.ae(manual_occs.count(), 1)
-        self.assertTrue(manual_occs[0].generated_by is None)
+        oneoff_occs = self.bin_night.occurrences.filter(start = clashingtime)
+        self.ae(oneoff_occs.count(), 1)
+        self.assertTrue(oneoff_occs[0].generated_by is None)
         
     def test_timeshift_into_exclusion(self):
         """

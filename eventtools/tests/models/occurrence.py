@@ -101,7 +101,7 @@ class TestOccurrences(AppTestCase):
         
         Occurrences that are currently taking place return true for now_on.
 
-        Occurrences that finish in the past return True for has_finished.
+        Occurrences that finish in the past return True for is_finished.
 
         We can find out how long we have to wait until an occurrence starts.
         We can find out how long it has been since an occurrence finished.
@@ -121,11 +121,11 @@ class TestOccurrences(AppTestCase):
         self.ae(o.duration, timedelta(days=1, seconds=3600))
         self.ae(o.timespan_description(), "1 January 2010, 9am until 10am on 2 January 2010")
 
-        self.ae(o.has_finished(), True)
-        self.ae(o.has_started(), True)
+        self.ae(o.is_finished(), True)
+        self.ae(o.is_started(), True)
         self.ae(o.now_on(), False)
-        self.ae(o2.has_finished(), False)
-        self.ae(o2.has_started(), True)
+        self.ae(o2.is_finished(), False)
+        self.ae(o2.is_started(), True)
         self.ae(o2.now_on(), True)
 
         self.assertTrue(o.time_to_go() < timedelta(0))

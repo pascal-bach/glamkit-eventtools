@@ -1,5 +1,3 @@
-from datetime import date, time, datetime, timedelta
-from dateutil.relativedelta import relativedelta
 from vobject.icalendar import utc
 
 from django.db import models
@@ -13,9 +11,12 @@ from django.template.defaultfilters import urlencode
 from django.utils.dateformat import format
 from django.utils.translation import ugettext as _
 from eventtools.models.xtimespan import XTimespanModel, XTimespanQSFN, XTimespanQuerySet, XTimespanManager
+from eventtools.conf import settings
 
 from eventtools.utils import datetimeify, dayify
 from eventtools.utils.managertype import ManagerType
+
+import datetime
 
 
 """
@@ -40,8 +41,20 @@ class OccurrenceQSFN(XTimespanQSFN):
         occurrences.
         """
         event_ids = self.values_list('event_id', flat=True).distinct()
-        return self.model.EventModel()._event_manager.filter(id__in=event_ids)                
-        
+        return self.model.EventModel()._event_manager.filter(id__in=event_ids)
+
+    def available(self):
+        return self.filter(status__in=("", None))
+
+    def unavailable(self):
+        return self.exclude(status="").exclude(status=None)
+
+    def fully_booked(self):
+        return self.filter(status=settings.OCCURRENCE_STATUS_FULLY_BOOKED[0])
+
+    def cancelled(self):
+        return self.filter(status=settings.OCCURRENCE_STATUS_CANCELLED[0])
+
 class OccurrenceQuerySet(XTimespanQuerySet, OccurrenceQSFN):
     pass #all the goodness is inherited from OccurrenceQuerySetFN
 
@@ -67,6 +80,8 @@ class OccurrenceModel(XTimespanModel):
         generated_by = models.ForeignKey(ExampleGenerator, related_name="occurrences", blank=True, null=True)
     """
 
+    status = models.CharField(max_length=20, blank=True, choices=settings.OCCURRENCE_STATUS_CHOICES)
+
     objects = OccurrenceManager()
     
     class Meta:
@@ -90,10 +105,31 @@ class OccurrenceModel(XTimespanModel):
     def delete(self, *args, **kwargs):
         try:
             r = super(OccurrenceModel, self).delete(*args, **kwargs)
-        except models.ProtectedError: #can't delete as there is an FK to me. Make manual.
+        except models.ProtectedError: #can't delete as there is an FK to me. Make one-off..
             self.generated_by = None
             self.save()
 
+    def is_cancelled(self):
+        return self.status == settings.OCCURRENCE_STATUS_CANCELLED[0]
+
+    def is_fully_booked(self):
+        return self.status == settings.OCCURRENCE_STATUS_FULLY_BOOKED[0]
+
+    def status_message(self):
+        if self.is_cancelled():
+            if self.is_finished():
+                iswas = "was"
+            else:
+                iswas = "is"
+            return "This session %s cancelled." % iswas
+
+        if self.is_finished():
+            return "This session has finished."
+
+        if self.is_fully_booked():
+            return "This session is fully booked."
+
+        return None
     # ical is coming back soon.
     # def get_absolute_url(self):
     #     return self.event.get_absolute_url()

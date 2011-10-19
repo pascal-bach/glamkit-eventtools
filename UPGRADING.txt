@@ -126,3 +126,15 @@ To migrate, using South:
 
 
 8) ./manage.py schemamigration youreventsapp --auto should pick up any other changes (fields which are now required, etc.). However, the GeneratorModel rule field is now required. In EventTools 1, Generators without a rule were 'one-off' events, which should now be stored as separate Occurrences. (If you do a migration like this, update this document with sample code!)
+
+
+# === Snippet to migrate exclusions from generators ===
+from dateutil import parser
+
+class Migration(SchemaMigration):
+
+    def forwards(self, orm):
+        for generator in orm['events.generator'].objects.filter(exceptions__isnull=False):
+            for exc in generator.exceptions.keys():
+                dt = parser.parse(exc)
+                orm['events.exclusion'].objects.create(event=generator.event, start=dt)

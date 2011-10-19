@@ -55,7 +55,7 @@ class XTimespanManager(models.Manager):
 
 class XTimespanModel(models.Model):
     start = models.DateTimeField(db_index=True)
-    _duration = models.PositiveIntegerField(_("duration (mins)"), blank=True, null=True)
+    _duration = models.PositiveIntegerField(_("duration (mins)"), blank=True, null=True, help_text=_("to create 'all day' events, set start time to 00:00 and leave duration blank"))
 
     objects = XTimespanManager()
 
@@ -130,14 +130,14 @@ class XTimespanModel(models.Model):
     def html_time_description(self):
         return self.time_description(html=True)
 
-    def has_finished(self):
+    def is_finished(self):
         return self.end() < datetime.datetime.now()
 
-    def has_started(self):
+    def is_started(self):
         return self.start < datetime.datetime.now()
 
     def now_on(self):
-        return self.has_started() and not self.has_finished()
+        return self.is_started() and not self.is_finished()
 
     def time_to_go(self):
         """
@@ -145,9 +145,9 @@ class XTimespanModel(models.Model):
         If self is in past, return - timedelta.
         If self is now on, return timedelta(0)
         """
-        if not self.has_started():
+        if not self.is_started():
             return self.start - datetime.datetime.now()
-        if self.has_finished():
+        if self.is_finished():
             return self.end() - datetime.datetime.now()
         return datetime.timedelta(0)
 

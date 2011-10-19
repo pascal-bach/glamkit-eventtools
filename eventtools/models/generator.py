@@ -123,7 +123,7 @@ class GeneratorModel(XTimespanModel):
         according to the following rules:
         
         Generally, if we can't automatically delete occurrences, we unhook them
-        from the generator, and make them manual. This is to prevent losing
+        from the generator, and make them one-off. This is to prevent losing
         information like tickets sold or shout-outs (we leave implementors to
         decide the workflow in these cases). We want to minimise the number of
         events that are deleted or unhooked, however. So:

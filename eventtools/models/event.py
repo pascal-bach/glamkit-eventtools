@@ -13,6 +13,7 @@ from mptt.managers import TreeManager
 
 from eventtools.utils.inheritingdefault import ModelInstanceAwareDefault #TODO: deprecate
 from eventtools.utils.pprint_timespan import pprint_datetime_span, pprint_date_span
+from eventtools.conf import settings
 
 class EventQuerySet(models.query.QuerySet):
     # much as you may be tempted to add "starts_between" and other
@@ -185,9 +186,13 @@ class EventModelBase(MPTTModelBase):
             ), 'Custom Event managers must subclass EventTreeManager.'
             
             # since EventTreeManager subclasses TreeManager, it also needs the
-            # mptt options
-            manager = cls._event_meta.event_manager_class(cls._mptt_meta)
+            # mptt options. The code below mimics the behaviour in
+            # mptt.models.MPTTModelBase.register
+
+            manager = cls._event_meta.event_manager_class()
             manager.contribute_to_class(cls, cls._event_meta.event_manager_attr)
+            manager.init_from_model(cls)
+
             setattr(cls, '_event_manager',
                 getattr(cls, cls._event_meta.event_manager_attr)
             )
@@ -317,9 +322,9 @@ class EventModel(MPTTModel):
     def get_absolute_url(self):
         return reverse('events:event', kwargs={'event_slug': self.slug })
         
-    def has_finished(self):
+    def is_finished(self):
         """ the event has finished if the closing occurrence has finished. """
-        return self.closing_occurrence().has_finished
+        return self.closing_occurrence().is_finished()
 
     def listed_under(self):
         """
@@ -355,7 +360,70 @@ class EventModel(MPTTModel):
 
     def sessions(self):
         return self.sessions_description
-        
+
+    def occurrence_statuses(self):
+        #returns a set of statuses of my occurrences
+        return set(self.occurrences_in_listing().values_list('status', flat=True).distinct())
+
+    def status(self):
+        #returns a status if all occurrences have the same status.
+        #Used in admin listing
+        statuses = self.occurrence_statuses()
+        if len(statuses) == 1:
+            return list(statuses)[0]
+        return "(various)"
+
+    def is_cancelled(self):
+        """Return True if all occurrences are cancelled"""
+        return self.occurrences_in_listing().count() == self.cancelled_occurrences().count()
+
+    def forthcoming_is_cancelled(self):
+        """Return True if all forthcoming occurrences are cancelled"""
+        return self.occurrences_in_listing().forthcoming().count() == self.cancelled_occurrences().forthcoming().count()
+
+    def is_fully_booked(self):
+        """
+        Return True if no occurrences are available and at least one is fully booked. (a mix of cancelled and fully booked is allowed)
+        """
+        return self.available_occurrences().count() == 0 and self.fully_booked_occurrences().count > 0
+
+    def forthcoming_is_fully_booked(self):
+        """
+        Return True if no forthcoming occurrences are available and at least one is fully booked. (a mix of cancelled and fully booked is allowed)
+        """
+        return self.available_occurrences().forthcoming().count() == 0 and self.fully_booked_occurrences().forthcoming().count > 0
+
+
+    def is_available(self):
+        """
+        Return True if any sessions are available (ie not cancelled or fully booked)
+        """
+        return self.available_occurrences().count() > 0
+
+    def unavailable_status_message(self):
+        if self.is_finished():
+            return "This event has finished."
+        if self.is_cancelled() or self.forthcoming_is_cancelled():
+            return "This event is CANCELLED."
+        if self.is_fully_booked() or self.forthcoming_is_fully_booked():
+            return "This event is fully booked." #If there are no available sessions and some are fully booked, the whole event is treated as fully booked.
+        return None
+
+    def available_occurrences(self):
+        return self.occurrences_in_listing().available()
+
+    def unavailable_occurrences(self):
+        return self.occurrences_in_listing().unavailable()
+
+    def cancelled_occurrences(self):
+        return self.occurrences_in_listing().cancelled()
+
+    def fully_booked_occurrences(self):
+        return self.occurrences_in_listing().fully_booked()
+
+    def variation_occurrences(self):
+        return self.occurrences_in_listing().exclude(event=self)
+
     # ical functions coming back soon
     # def ics_url(self):
     #     """

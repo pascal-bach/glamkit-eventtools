@@ -2,7 +2,7 @@ import datetime
 
 import django
 from django import forms
-from django.conf import settings
+from eventtools.conf import settings
 from django.conf.urls.defaults import patterns, url
 from django.contrib import admin, messages
 from django.core import validators
@@ -15,11 +15,21 @@ from django.forms.models import BaseInlineFormSet
 from mptt.forms import TreeNodeChoiceField
 from mptt.admin import MPTTModelAdmin
 from django.utils.translation import ugettext, ugettext_lazy as _
+from django.template.defaultfilters import date, time
 
 from utils.diff import generate_diff
 
 from .models import Rule
-# from .filters import IsGeneratedListFilter #needs django 1.4
+
+import django
+if django.VERSION[0] == 1 and django.VERSION[1] >= 4:
+    DJANGO14 = True
+else:
+    DJANGO14 = False
+
+if DJANGO14:
+    from .filters import IsGeneratedListFilter #needs django 1.4
+    
 MPTT_ADMIN_LEVEL_INDENT = getattr(settings, 'MPTT_ADMIN_LEVEL_INDENT', 10)
 
 
@@ -38,20 +48,31 @@ def _remove_occurrences(modeladmin, request, queryset):
         if m.generated_by is not None:
             m.event.exclusions.get_or_create(start=m.start)
         m.delete()
-_remove_occurrences.short_description = "delete occurrences (and create exclusions)"
+_remove_occurrences.short_description = "Delete occurrences (and prevent recreation by a repeating occurrence)"
 
 def _wipe_occurrences(modeladmin, request, queryset):
     queryset.delete()
-_wipe_occurrences.short_description = "delete occurrences (without creating exclusions)"
+_wipe_occurrences.short_description = "Delete occurrences (but allow recreation by a repeating occurrence)"
 
-
-def _convert_to_manual(modeladmin, request, queryset):
+def _convert_to_oneoff(modeladmin, request, queryset):
     for m in queryset:
         # if the occurrence was generated, then add it as an exclusion.
         if m.generated_by is not None:
             m.event.exclusions.get_or_create(start=m.start)
     queryset.update(generated_by=None)
-_convert_to_manual.short_description = "make occurrence manual (and create exclusions)"
+_convert_to_oneoff.short_description = "Make occurrences one-off (and prevent recreation by a repeating occurrence)"
+
+def _cancel(modeladmin, request, queryset):
+    queryset.update(status=settings.OCCURRENCE_STATUS_CANCELLED[0])
+_cancel.short_description = "Make occurrences cancelled"
+
+def _fully_booked(modeladmin, request, queryset):
+    queryset.update(status=settings.OCCURRENCE_STATUS_FULLY_BOOKED[0])
+_fully_booked.short_description = "Make occurrences fully booked"
+
+def _clear_status(modeladmin, request, queryset):
+    queryset.update(status="")
+_clear_status.short_description = "Clear booked/cancelled status"
 
 class OccurrenceAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -76,26 +97,48 @@ class OccurrenceAdminForm(forms.ModelForm):
 def OccurrenceAdmin(OccurrenceModel):
     class _OccurrenceAdmin(admin.ModelAdmin):
         form = OccurrenceAdminForm
-        list_display = ['event', 'string_if_editable', 'start', '_duration', 'is_automatic',]
-        list_display_links = ['string_if_editable',]
-        list_editable = ['event']
-        # list_filter = [IsGeneratedListFilter,] #when 1.4 comes...
+        list_display = ['start', '_duration', 'event', 'from_a_repeating_occurrence', 'edit_link', 'status']
+        list_display_links = ['start'] # this is turned off in __init__
+        list_editable = ['event', 'status']
+        if DJANGO14:
+            list_filter = [IsGeneratedListFilter,]
         change_list_template = 'admin/eventtools/occurrence_list.html'
-        fields = ("event" , "start", "_duration", "generated_by")
+        fields = ("event" , "start", "_duration", "generated_by", 'status')
         readonly_fields = ('generated_by', )
-        actions = [_remove_occurrences, _wipe_occurrences, _convert_to_manual]
+        actions = [_cancel, _fully_booked, _clear_status, _convert_to_oneoff, _remove_occurrences, _wipe_occurrences]
         date_hierarchy = 'start'
         
         def __init__(self, *args, **kwargs):
             super(_OccurrenceAdmin, self).__init__(*args, **kwargs)
             self.event_model = self.model.EventModel()
+            self.list_display_links = (None,) #have to specify it here to avoid Django complaining
   
-        def string_if_editable(self, occurrence):
+        def edit_link(self, occurrence):
             if occurrence.generated_by is not None:
-                return "" #can't click on an empty link
+                change_url = reverse(
+                    '%s:%s_%s_change' % (
+                        self.admin_site.name,
+                        self.event_model._meta.app_label,
+                        self.event_model._meta.module_name),
+                    args=(occurrence.generated_by.event.id,)
+                )
+                return "via a repeating occurrence in <a href='%s'>%s</a>" % (
+                    change_url,
+                    occurrence.generated_by.event,
+                )
             else:
-                return "Edit directly"
-        string_if_editable.short_description = "edit manual occurrences"
+                change_url = reverse(
+                    '%s:%s_%s_change' % (
+                        self.admin_site.name,
+                        type(occurrence)._meta.app_label,
+                        type(occurrence)._meta.module_name),
+                    args=(occurrence.id,)
+                )
+                return "<a href='%s'>Edit</a>" % (
+                    change_url,
+                )
+        edit_link.short_description = "edit"
+        edit_link.allow_tags = True
 
         def get_changelist_form(self, request, **kwargs):
             kwargs.setdefault('form', OccurrenceAdminForm)
@@ -109,17 +152,10 @@ def OccurrenceAdmin(OccurrenceModel):
                     self.event_model._meta.module_name),
                 args=(event.id,)
             )
-  
-#        def event_edit_link(self, occurrence):
-#            return "<a href=\"%s\">%s</a>" % (
-#                self.event_edit_url(occurrence.event), occurrence.event
-#            )
-#        event_edit_link.allow_tags = True
-#        event_edit_link.short_description = "Event"
-  
-        def is_automatic(self, occurrence):
+
+        def from_a_repeating_occurrence(self, occurrence):
             return occurrence.generated_by is not None
-        is_automatic.boolean = True
+        from_a_repeating_occurrence.boolean = True
   
         def get_urls(self):
             """
@@ -182,7 +218,6 @@ def OccurrenceAdmin(OccurrenceModel):
             if 'delete_selected' in actions:
                 del actions['delete_selected']
             return actions
-     
     return _OccurrenceAdmin
 
 def EventForm(EventModel):
@@ -193,20 +228,23 @@ def EventForm(EventModel):
             model = EventModel
     return _EventForm
 
-def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
+def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
     """ pass in the name of your EventModel subclass to use this admin. """
     
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
-        list_display = ['title_bold_if_listed', 'occurrence_link', 'season'] # leave as list to allow extension
+        list_display = ['title_bold_if_listed', 'occurrence_link', 'season', 'status'] # leave as list to allow extension
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}
         inlines = [
             OccurrenceInline(EventModel.OccurrenceModel()),
             GeneratorInline(EventModel.GeneratorModel()),
-            ExclusionInline(EventModel.ExclusionModel()),
-        ] #leave as a list, not tuple, for easy extension
+        ]
+        if show_exclusions:
+            inlines += [
+                ExclusionInline(EventModel.ExclusionModel()),
+            ]
 
         def __init__(self, *args, **kwargs):
             super(_EventAdmin, self).__init__(*args, **kwargs)
@@ -232,13 +270,17 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                         self.occurrence_model._meta.module_name),
                         args=(event.id,)
                 )
-                
+
         def occurrence_link(self, event):
-            count = event.occurrences_in_listing().count()
+            try:
+                count = event.occurrences_in_listing().count()
+            except:
+                import pdb; pdb.set_trace()
             direct_count = event.occurrences.count()
 
             url = self.occurrence_edit_url(event)
-            if not count:
+
+            if count == 0:
                 return 'No occurrences yet'
             elif count == 1:
                 r = '<a href="%s">1 Occurrence</a>' % url
@@ -257,17 +299,16 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 url(r'(?P<parent_id>\d+)/create_variation/',
                     self.admin_site.admin_view(self._create_variation))
                 ) + super(_EventAdmin, self).get_urls()
-        
+
         def _create_variation(self, request, parent_id):
             parent = get_object_or_404(EventModel, id=parent_id)
-            child = EventModel(parent=parent)
-        
+
             # We don't want to save child yet, as it is potentially incomplete.
             # Instead, we'll get the parent and inheriting fields out of Event
             # and put them into a GET string for the new_event form.
-            
+
             GET = QueryDict("parent=%s" % parent.id).copy()
-            
+
             for field_name in EventModel._event_meta.fields_to_inherit:
                 parent_attr = getattr(parent, field_name)
                 if parent_attr:
@@ -277,16 +318,16 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                         GET[field_name] = parent_attr.pk
                     else:
                         GET[field_name] = parent_attr
-        
+
             return redirect(
                 reverse("%s:%s_%s_add" % (
                     self.admin_site.name, EventModel._meta.app_label,
                     EventModel._meta.module_name)
                 )+"?%s" % GET.urlencode())
-        
+
         def change_view(self, request, object_id, extra_context={}):
             obj = EventModel._event_manager.get(pk=object_id)
-        
+
             if obj.parent:
                 fields_diff = generate_diff(obj.parent, obj, include=EventModel._event_meta.fields_to_inherit)
             else:
@@ -297,7 +338,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin):
                 'object': obj,
                 'occurrence_edit_url': self.occurrence_edit_url(event=obj),
             }
-            extra_context.update(extra_extra_context)      
+            extra_context.update(extra_extra_context)
             return super(_EventAdmin, self).change_view(request, object_id, extra_context)
     return _EventAdmin
 
@@ -311,12 +352,21 @@ else:
             pass
         return _FeinCMSEventAdmin
 
+
+#TODO: Make a read-only display to show 'reassigned' generated occurrences.
 class OccurrenceInlineFormSet(BaseInlineFormSet):
     """
     Shows non-generated occurrences
     """
     def __init__(self, *args, **kwargs):
-        kwargs['queryset'] = kwargs['queryset'].filter(generated_by__isnull=True)
+        event = kwargs.get('instance')
+        if event:
+            # Exclude occurrences that are generated by one of my generators
+            my_generators = event.generators.all()
+            kwargs['queryset'] = kwargs['queryset'].exclude(generated_by__in=my_generators)
+        else:
+            #new form
+            pass
         super(OccurrenceInlineFormSet, self).__init__(*args, **kwargs)
 
 def OccurrenceInline(OccurrenceModel):
@@ -324,7 +374,8 @@ def OccurrenceInline(OccurrenceModel):
         model = OccurrenceModel
         formset = OccurrenceInlineFormSet
         extra = 1
-        fields = ('start', '_duration',)        
+        fields = ('start', '_duration', 'generated_by')
+        readonly_fields = ('generated_by', )
     return _OccurrenceInline
 
 def ExclusionInline(ExclusionModel):
