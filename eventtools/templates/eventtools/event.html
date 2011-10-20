@@ -12,9 +12,7 @@
 			<p><cite>{{ event.title }}</cite> {% if event.is_finished %}was{% else %}is{% endif %} one of the <a href="{{ listed_under.get_absolute_url }}">{{ listed_under.title }}</a> sessions.</p>
 		{% endif %}
 
-
 		{% if event.sessions %}<p class="season">When: {{ event.sessions|linebreaksbr }}<p>{% endif %}
-
 
 		<h2>Sessions</h2>
 

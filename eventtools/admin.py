@@ -301,16 +301,23 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
                 ) + super(_EventAdmin, self).get_urls()
 
         def _create_variation(self, request, parent_id):
+            """
+            We don't want to try to save child yet, as it is potentially incomplete.
+            Instead, we'll get the parent and inheriting fields out of Event
+            and put them into a GET string for the new_event form.
+
+            To get values, we first try inheritable_FOO, to populate the form.
+
+            @property
+            def inheritable_price:
+                return self.price.raw
+            """
             parent = get_object_or_404(EventModel, id=parent_id)
-
-            # We don't want to save child yet, as it is potentially incomplete.
-            # Instead, we'll get the parent and inheriting fields out of Event
-            # and put them into a GET string for the new_event form.
-
             GET = QueryDict("parent=%s" % parent.id).copy()
 
             for field_name in EventModel._event_meta.fields_to_inherit:
-                parent_attr = getattr(parent, field_name)
+                inheritable_field_name = "inheritable_%s" % field_name
+                parent_attr =  getattr(parent, inheritable_field_name, getattr(parent, field_name))
                 if parent_attr:
                     if hasattr(parent_attr, 'all'): #for m2m. Sufficient?
                         GET[field_name] = u",".join([unicode(i.pk) for i in parent_attr.all()])

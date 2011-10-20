@@ -277,18 +277,31 @@ class EventModel(MPTTModel):
         return type(self)._event_manager.get(pk=self.pk)
         
     def _cascade_changes_to_children(self):
+        """
+        Go through the fields_to_inherit, and apply my values to my children,
+        if my children don't have altered values.
+
+        Now tries 'inheritable_FOO' attributes for getting attributes where the
+        native value isn't in the right form,
+        e.g. MarkItUp fields, where the "Field" is the value.
+
+        @property
+        def inheritable_price:
+            return self.price.raw
+        """
         if self.pk:
             saved_self = type(self)._event_manager.get(pk=self.pk)
             attribs = type(self)._event_meta.fields_to_inherit
         
             for child in self.get_children():
                 for a in attribs:
+                    inheritable_attr = "inheritable_%s" % a
                     try:
-                        saved_value = getattr(saved_self, a)
-                        ch_value = getattr(child, a)
+                        saved_value = getattr(saved_self, inheritable_attr, getattr(saved_self, a))
+                        ch_value =  getattr(child, inheritable_attr, getattr(child, a))
                         if ch_value == saved_value:
                             #the child's value is unchanged from the parent
-                            new_value = getattr(self, a)
+                            new_value = getattr(self, inheritable_attr, getattr(self, a))
                             setattr(child, a, new_value)
                     except AttributeError:
                         continue
@@ -392,7 +405,6 @@ class EventModel(MPTTModel):
         Return True if no forthcoming occurrences are available and at least one is fully booked. (a mix of cancelled and fully booked is allowed)
         """
         return self.available_occurrences().forthcoming().count() == 0 and self.fully_booked_occurrences().forthcoming().count > 0
-
 
     def is_available(self):
         """
