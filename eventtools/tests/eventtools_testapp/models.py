@@ -19,7 +19,6 @@ class ExampleGenerator(GeneratorModel):
 class ExampleOccurrence(OccurrenceModel):
     generated_by = models.ForeignKey(ExampleGenerator, related_name="occurrences", blank=True, null=True)
     event = models.ForeignKey(ExampleEvent, related_name="occurrences")
-    status = models.CharField(max_length=20, blank=True, null=True)
 
 class ExampleExclusion(ExclusionModel):
     event = models.ForeignKey(ExampleEvent, related_name="exclusions")

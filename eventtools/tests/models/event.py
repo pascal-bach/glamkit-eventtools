@@ -161,7 +161,7 @@ class TestEvents(AppTestCase):
         If the child event has a different value to the original, then the change doesn't cascade.
         """
         self.ae(self.film.get_descendant_count(), 3)
-        self.ae(list(self.film.get_descendants(include_self=True)), [self.film, self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn])
+        self.ae(set(self.film.get_descendants(include_self=True)), set([self.film, self.film_with_talk, self.film_with_talk_and_popcorn, self.film_with_popcorn]))
 
         self.film.title = "Irish fillum night"
         self.film.save()
