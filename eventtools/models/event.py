@@ -259,7 +259,7 @@ class EventModel(MPTTModel):
         #this has to happen before super.save, so that we can tell what's
         #changed
         if not self.slug:
-            self.slug = slugify(self.title)
+            self.slug = slugify(unicode(self))
 
         self._cascade_changes_to_children()
         r = super(EventModel, self).save(*args, **kwargs)

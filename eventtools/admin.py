@@ -233,7 +233,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
     
     class _EventAdmin(SuperModel):
         form = EventForm(EventModel)
-        list_display = ['title_bold_if_listed', 'occurrence_link', 'season', 'status'] # leave as list to allow extension
+        list_display = ['unicode_bold_if_listed', 'occurrence_link', 'season', 'status'] # leave as list to allow extension
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}
@@ -250,7 +250,7 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
             super(_EventAdmin, self).__init__(*args, **kwargs)
             self.occurrence_model = EventModel.OccurrenceModel()
 
-        def title_bold_if_listed(self, obj):
+        def unicode_bold_if_listed(self, obj):
             if obj.is_listed():
                 result = "<span style='font-weight:bold;padding-left:%spx'>%s</span>"
             else:
@@ -258,10 +258,10 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
 
             return result % (
                 (5 + MPTT_ADMIN_LEVEL_INDENT * obj.level),
-                obj.title,
+                unicode(obj),
             )
-        title_bold_if_listed.allow_tags = True
-        title_bold_if_listed.short_description = _("title (items in bold will be listed; other items are templates or variations)")
+        unicode_bold_if_listed.allow_tags = True
+        unicode_bold_if_listed.short_description = _("title (items in bold will be listed; other items are templates or variations)")
 
         def occurrence_edit_url(self, event):
             return reverse("%s:%s_%s_changelist_for_event" % (
