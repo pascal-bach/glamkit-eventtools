@@ -207,7 +207,7 @@ def nav_calendar(
     )
 
 def nav_calendars(
-        context, occurrence_qs=[],
+        context, occurrence_qs=[], selected_occurrence=None,
         date_href_fn=None,
         date_class_fn=None,
     ):
@@ -219,8 +219,12 @@ def nav_calendars(
     #TODO: allow dates, not just occurrence_qs
     if date_class_fn is None and occurrence_qs:
         occurrence_days = [o.start.date() for o in occurrence_qs]
-        date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, None)
-    
+        if selected_occurrence:
+            date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, selected_occurrence.start.date())
+        else:
+            date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, None)
+
+
     calendars = []
     if occurrence_qs.count() > 0:
         first_date = occurrence_qs[0].start.date()

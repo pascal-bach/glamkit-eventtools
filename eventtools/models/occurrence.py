@@ -130,10 +130,13 @@ class OccurrenceModel(XTimespanModel):
             return "This session is fully booked."
 
         return None
+
+    def get_absolute_url(self):
+        return reverse('events:occurrence', kwargs={'event_slug': self.event.slug, 'occurrence_pk': self.pk })
+
+
     # ical is coming back soon.
-    # def get_absolute_url(self):
-    #     return self.event.get_absolute_url()
-    # 
+    #
     # def _resolve_attr(self, attr):
     #     v = getattr(self, attr, None)
     #     if v is not None:

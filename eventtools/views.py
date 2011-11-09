@@ -39,7 +39,8 @@ class EventViews(object):
                 url(r'^$', self.index, name='index'),
                 url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/$', self.on_date, name='on_date'),
                 url(r'^(?P<event_slug>[-\w]+)/$', self.event, name='event'),
-        
+                url(r'^(?P<event_slug>[-\w]+)/(?P<occurrence_pk>[\d]+)/$', self.occurrence, name='occurrence'),
+
                 #ical - needs rethinking
                 # url(r'^ical\.ics$', self.occurrence_list_ical, name='occurrence_list_ical'),
                 # url(r'^(?P<event_slug>[-\w]+)/ical\.ics$', self.event_ical, name='event_ical'),
@@ -56,7 +57,24 @@ class EventViews(object):
         context['event'] = event
 
         return render_to_response('eventtools/event.html', context)
- 
+
+    def occurrence(self, request, event_slug, occurrence_pk):
+        """
+        Returns a page similar to eventtools/event.html, but for a specific occurrence.
+
+        event_slug is ignored, since occurrences may move from event to sub-event, and
+        it would be nice if URLs continued to work.
+        """
+
+        occurrence = get_object_or_404(self.occurrence_qs, pk=occurrence_pk)
+        event = occurrence.event
+        context = RequestContext(request)
+        context['occurrence'] = occurrence
+        context['event'] = event
+
+        return render_to_response('eventtools/event.html', context)
+
+
     # def event_ical(self, request, event_slug):
     #     event_context = self._event_context(request, event_slug)
     #     return response_as_ical(request, event_context['occurrence_pool'])

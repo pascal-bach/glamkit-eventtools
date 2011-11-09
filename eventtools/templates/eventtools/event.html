@@ -8,21 +8,27 @@
 	{% with listed_under=event.listed_under %}
 		<h1>{{ event.title }}</h1>
 		{% if perms.events.can_change_event %}<p><a href="{% url admin:events_event_change event.pk %}">edit</a></p>{% endif %}
+
+		{% if occurrence %}
+			<p class="status">{{ occurrence.start_date|date:"l, j F Y" }}, {{ occurrence.html_time_description }}{% if occurrence.status_message %} ({{ occurrence.status_message }}){% endif %} - <a href="{{ occurrence.event.get_absolute_url }}">view all sessions</a> </p>
+		{% else %}
+			{% if listed_under.unavailable_status_message %}
+				<p class="status">
+					{{ listed_under.unavailable_status_message }}
+				</p>
+			{% endif %}
+		{% endif %}
+
 		{% if listed_under != event %}
 			<p><cite>{{ event.title }}</cite> {% if event.is_finished %}was{% else %}is{% endif %} one of the <a href="{{ listed_under.get_absolute_url }}">{{ listed_under.title }}</a> sessions.</p>
 		{% endif %}
 
 		{% if event.sessions %}<p class="season">When: {{ event.sessions|linebreaksbr }}<p>{% endif %}
 
-		<h2>Sessions</h2>
+		<h2>{% if occurrence %}Other sessions{% else %}Sessions{% endif %}</h2>
 
-		{% if listed_under.unavailable_status_message %}
-			<p class="status">
-				{{ listed_under.unavailable_status_message }}
-			</p>
-		{% endif %}
 
-		{% nav_calendars event.occurrences_in_listing %}
+		{% nav_calendars event.occurrences_in_listing occurrence %}
 
 		{% with event.occurrences_in_listing.all as occurrences %}
 			{% if occurrences %}
