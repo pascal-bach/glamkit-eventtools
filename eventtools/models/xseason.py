@@ -1,3 +1,4 @@
+from datetime import date
 from django.db import models
 from eventtools.utils.pprint_timespan \
     import pprint_datetime_span, pprint_date_span
@@ -77,3 +78,6 @@ class XSeasonModel(models.Model):
         
     def __unicode__(self):
         return self.season()
+
+    def is_finished(self):
+        return self.end < date.today()
