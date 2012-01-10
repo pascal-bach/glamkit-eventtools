@@ -163,22 +163,11 @@ def calendar(
         date=next_date, href=month_href_fn(next_date)
     )
 
-    prev_day = day+relativedelta(days=-1)
-    decorated_prev_day = DecoratedDate(
-        date=prev_day, href=month_href_fn(prev_day)
-    )
-    
-    next_day = day+relativedelta(days=+1)
-    decorated_next_day = DecoratedDate(
-        date=next_day, href=month_href_fn(next_day)
-    )
 
     context.update({
         'weeks': decorated_weeks,
         'prev_month': decorated_prev_date,
         'next_month': decorated_next_date,
-        'prev_day': decorated_prev_day ,
-        'next_day': decorated_next_day ,
     })
     
     return context
