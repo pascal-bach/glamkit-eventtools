@@ -1,4 +1,5 @@
 import inspect
+from types import NoneType
 from django.db.models.fields import NOT_PROVIDED
 from django.utils.encoding import force_unicode
 from django.db import connection
@@ -38,9 +39,10 @@ class ModelInstanceAwareDefault():
         # to the default callable. Since it doesn't, let's grab it with voodoo.
         frame = inspect.currentframe().f_back
         field = frame.f_locals.get('self', None)
-
         parent = None
-        if field:
+        # calling if field: on a forms.BoundField in the end calls data() again
+        # and leads to a recursion error, using type(field) avoids this.
+        if type(field) is not NoneType:
             frame = frame.f_back
         else:
             frame = None
