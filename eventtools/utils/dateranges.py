@@ -29,7 +29,12 @@ class XDateRange(object):
     def __init__(self, d1, d2):
         self.d1 = d1
         self.d2 = d2
-        
+        if d1 and d2:
+            self.delta = d2 - d1
+        else:
+            # TODO: what should this be?
+            self.delta = timedelta(0)
+    
     def __contains__(self, d):
         if self.d1 is not None:
             after_start = d >= self.d1
@@ -40,10 +45,26 @@ class XDateRange(object):
         else:
             before_end = True
         return after_start and before_end  
+    
+    def __unicode__(self):
+        return '%s - %s' % (
+            self.d1.strftime('%d %b %Y') if self.d1 else '',
+            self.d2.strftime('%d %b %Y') if self.d2 else '',
+        )
+    
+    def later(self):
+        start = self.d2 if self.d2 else self.d1
+        return XDateRange(start, start + self.delta + timedelta(1))
+    
+    def earlier(self):
+        start = self.d1 if self.d1 else self.d2
+        return XDateRange(start - self.delta - timedelta(1), start)
+    
 
 class DateTester(object):
     """
-    A class that takes a set of occurrences. Then you can test dates with it to see if the date is in that set.
+    A class that takes a set of occurrences. Then you can test dates with it to
+    see if the date is in that set.
     
     if date.today() in date_tester_object:
         ...
