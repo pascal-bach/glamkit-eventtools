@@ -65,7 +65,8 @@ class XTimespanModel(models.Model):
 
     def get_duration(self):
         """
-        _duration is a value in minutes. The duration property returns a timedelta representing this.
+        _duration is a value in minutes. The duration property returns a 
+        timedelta representing this.
         """
         if self._duration:
             return datetime.timedelta(seconds = self._duration * 60)
@@ -88,13 +89,18 @@ class XTimespanModel(models.Model):
 
     def all_day(self):
         """
-        WARNING: the implementation of 'all day' may change, for example by making it a BooleanField. If this is important to you, define it yourself.
+        WARNING: the implementation of 'all day' may change, for example by 
+        making it a BooleanField. If this is important to you, define it 
+        yourself.
 
-        By default, an event is 'all day' if the start time is time.min (ie midnight) and the duration is not provided.
+        By default, an event is 'all day' if the start time is time.min 
+        (ie midnight) and the duration is not provided.
 
-        'All day' is distinguished from events that last 24 hours, because there is a reader assumption that opening hours are taken into account.
+        'All day' is distinguished from events that last 24 hours, because 
+        there is a reader assumption that opening hours are taken into account.
 
-        Implementers may prefer their own definition, maybe adding a BooleanField that overrides the given times.
+        Implementers may prefer their own definition, maybe adding a 
+        BooleanField that overrides the given times.
         """
         return self.start.time() == datetime.time.min and not self._duration
 

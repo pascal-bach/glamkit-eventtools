@@ -22,43 +22,39 @@ LAST_DAY_OF_WEEKEND = _weekday_fn(settings.LAST_DAY_OF_WEEKEND)
 
 class XDateRange(object):
     """
-    Embryo class to replace xdaterange below, that allows d1 or d2 to be None.
+    Embryo class to replace xdaterange below.
     
     For now this is only used in calendar sets (which uses the 'in' method)
     """
-    def __init__(self, d1, d2):
-        self.d1 = d1
-        self.d2 = d2
-        if d1 and d2:
-            self.delta = d2 - d1
-        else:
-            # TODO: what should this be?
-            self.delta = timedelta(0)
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        self.delta = end - start
     
-    def __contains__(self, d):
-        if self.d1 is not None:
-            after_start = d >= self.d1
+    def __contains__(self, item):
+        if self.start is not None:
+            after_start = item >= self.start
         else:
             after_start = True
-        if self.d2 is not None:
-            before_end = d <= self.d2
+        if self.end is not None:
+            before_end = item <= self.end
         else:
             before_end = True
         return after_start and before_end  
     
     def __unicode__(self):
-        return '%s - %s' % (
-            self.d1.strftime('%d %b %Y') if self.d1 else '',
-            self.d2.strftime('%d %b %Y') if self.d2 else '',
-        )
+        if self.delta:
+            return '%s - %s' % (
+                self.start.strftime('%d %b %Y'),
+                self.end.strftime('%d %b %Y'),
+            )
+        return self.start.strftime('%d %b %Y')
     
     def later(self):
-        start = self.d2 if self.d2 else self.d1
-        return XDateRange(start, start + self.delta + timedelta(1))
+        return XDateRange(self.end, self.end + self.delta + timedelta(1))
     
     def earlier(self):
-        start = self.d1 if self.d1 else self.d2
-        return XDateRange(start - self.delta - timedelta(1), start)
+        return XDateRange(self.start - self.delta - timedelta(1), self.start)
     
 
 class DateTester(object):
