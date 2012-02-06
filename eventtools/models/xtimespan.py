@@ -84,6 +84,33 @@ class XTimespanModel(models.Model):
 
     duration = property(get_duration, set_duration)
 
+    def duration_string(self):
+        if self.all_day():
+            return u"all day"
+        d = self.duration
+        result = []
+        if d.days:
+            plural = "" if d.days == 1 else "s"
+            result.append("%s day%s" % (d.days, plural))
+        if d.seconds:
+            num_hours = d.seconds / 3600
+            remaining_seconds = d.seconds - (3600 * num_hours)
+
+            if remaining_seconds == 30 * 60:
+                num_hours += 0.5
+                remaining_seconds = 0
+
+            if num_hours:
+                plural = "" if num_hours == 1 else "s"
+                result.append("%s hour%s" % (num_hours, plural))
+
+            num_minutes = remaining_seconds / 60
+            if num_minutes:
+                plural = "" if num_minutes == 1 else "s"
+                result.append("%s min%s" % (num_minutes, plural))
+
+        return " ".join(result)
+
     def end(self):
         return self.start + self.duration
 
