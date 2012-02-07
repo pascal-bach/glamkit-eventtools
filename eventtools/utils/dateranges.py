@@ -51,10 +51,10 @@ class XDateRange(object):
         return self.start.strftime('%d %b %Y')
     
     def later(self):
-        return XDateRange(self.end, self.end + self.delta + timedelta(1))
+        return XDateRange(self.end + timedelta(1), self.end + self.delta + timedelta(1))
     
     def earlier(self):
-        return XDateRange(self.start - self.delta - timedelta(1), self.start)
+        return XDateRange(self.start - self.delta - timedelta(1), self.start - timedelta(1))
     
 
 class DateTester(object):

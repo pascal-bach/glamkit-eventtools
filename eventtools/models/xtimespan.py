@@ -85,6 +85,10 @@ class XTimespanModel(models.Model):
     duration = property(get_duration, set_duration)
 
     def duration_string(self):
+        """
+        Prints out the duration in plain-ish English.
+        *cough* internationalisation *cough*
+        """
         if self.all_day():
             return u"all day"
         d = self.duration
