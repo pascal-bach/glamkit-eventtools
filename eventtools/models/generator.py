@@ -59,7 +59,7 @@ class GeneratorModel(XTimespanModel):
         if not self.rule_id:
             raise ExceptionClass('A Rule must be given')
     
-        if self.repeat_until and self.repeat_until < self.start.date():
+        if self.start and self.repeat_until and self.repeat_until < self.start.date():
             raise ExceptionClass(
                 'Repeat until date must not be earlier than start date')
             
