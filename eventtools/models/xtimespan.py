@@ -38,10 +38,10 @@ class XTimespanQSFN(object):
 
     #misc queries (note they assume starts_)
     def forthcoming(self):
-        return self.starts_after(datetime.date.today())
+        return self.starts_after(datetime.datetime.now())
 
     def recent(self):
-        return self.starts_before(datetime.date.today())
+        return self.starts_before(datetime.datetime.now())
 
 class XTimespanQuerySet(models.query.QuerySet, XTimespanQSFN):
     pass #all the goodness is inherited from XTimespanQSFN
