@@ -192,7 +192,37 @@ class TestEvents(AppTestCase):
     def test_diffs(self):
         self.ae(unicode(self.film), u'Film Night')
         self.ae(unicode(self.film_with_talk), u'Film Night (director\'s talk)')
-        
     """
     DONE BUT NO TESTS: When you view an event, the diff between itself and its parent is shown, or fields are highlighted, etc, see django-moderation.
     """
+
+    def test_times_description(self):
+        """
+        Testing the correct formatting and logic for Event.times_description, which tries to infer a regular starting
+        time from an event's occurrences.
+        """
+        d1 = date(2010,1,1)
+        d2 = date(2010,1,2)
+        t1 = time(9,00)
+        t2 = time(11,00)
+
+        e = ExampleEvent.eventobjects.create(title="event with one occurrence")
+        e.occurrences.create(start=datetime.combine(d1, t1), _duration=25*60)
+        self.ae(e.times_description(), "9.00am")
+
+        e = ExampleEvent.eventobjects.create(title="event with two occurrences on the same day, with different starting times")
+        e.occurrences.create(start=datetime.combine(d1, t1), _duration=25*60)
+        e.occurrences.create(start=datetime.combine(d1, t2), _duration=25*60)
+        self.ae(e.times_description(), "Times vary")
+
+        e = ExampleEvent.eventobjects.create(title="event with two occurrences on two days, with similar starting times")
+        e.occurrences.create(start=datetime.combine(d1, t1), _duration=25*60)
+        e.occurrences.create(start=datetime.combine(d2, t1), _duration=25*60)
+        self.ae(e.times_description(), "9.00am")
+
+        e = ExampleEvent.eventobjects.create(title="event with two occurrences on two days, with different starting times")
+        e.occurrences.create(start=datetime.combine(d1, t1), _duration=25*60)
+        e.occurrences.create(start=datetime.combine(d2, t2), _duration=25*60)
+        self.ae(e.times_description(), "Times vary")
+
+

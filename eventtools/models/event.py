@@ -436,6 +436,25 @@ class EventModel(MPTTModel):
     def variation_occurrences(self):
         return self.occurrences_in_listing().exclude(event=self)
 
+    def times_description(self, formatting='%I.%M%p'):
+        """
+        Produces a string representing the regular time in which an event occurs.
+
+        Ex: for an event only ever occurring at 5:30pm each day, it returns '5.30pm'.
+
+        Ex: for an event with irregular times or multiple occurrences per day, it
+            returns 'Times vary'
+        """
+        starting_times = list(set([
+            occurrence.start.time() for occurrence in self.occurrences.all()
+        ]))
+
+        if len(starting_times) == 1:
+            # `lower` converts Django's 'PM' into 'pm' and `lstrip` removes any leading '0'
+            return starting_times[0].strftime(formatting).lower().lstrip('0')
+        else:
+            return 'Times vary'
+
     # ical functions coming back soon
     # def ics_url(self):
     #     """
