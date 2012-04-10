@@ -237,14 +237,33 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
         change_form_template = 'admin/eventtools/event.html'
         save_on_top = True
         prepopulated_fields = {'slug': ('title', )}
-        inlines = [
+
+        _inlines = [
             OccurrenceInline(EventModel.OccurrenceModel()),
             GeneratorInline(EventModel.GeneratorModel()),
         ]
+
         if show_exclusions:
-            inlines += [
+            _inlines += [
                 ExclusionInline(EventModel.ExclusionModel()),
             ]
+
+        # Legacy Django < 1.4
+        if not DJANGO14:
+            if hasattr(self, 'inline_instances'):
+                inline_instances += _inlines
+            else:
+                inline_instances = _inlines
+
+        # Django 1.4+
+        def get_inline_instances(self, request):
+            # Get any regular Django inlines the user may have defined.
+            inline_instances = super(_EventAdmin, self).get_inline_instances(request)
+            for inline_class in self._inlines:
+                inline_instance = inline_class(self.model, self.admin_site)
+                inline_instances.append( inline_instance )
+
+            return inline_instances
 
         def __init__(self, *args, **kwargs):
             super(_EventAdmin, self).__init__(*args, **kwargs)
