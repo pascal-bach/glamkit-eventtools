@@ -193,10 +193,9 @@ class XTimespanModel(models.Model):
             return _("Today")
         elif self.start.date() == datetime.date.today() + datetime.timedelta(days=1):
             return _("Tomorrow")
-        elif self.start.date() < datetime.date.today() + datetime.timedelta(days=7):
-            return format(self.start, "l")
-        else:
-            return format(self.start, "m d")
+        elif self.start.date() == datetime.date.today() - datetime.timedelta(days=1):
+            return _("Yesterday")
+        return self.start.strftime("%A, %d %B %Y")
 
 """
 TODO:
