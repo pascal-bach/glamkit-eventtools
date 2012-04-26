@@ -100,10 +100,6 @@ class XTimespanModel(models.Model):
             num_hours = d.seconds / 3600
             remaining_seconds = d.seconds - (3600 * num_hours)
 
-            if remaining_seconds == 30 * 60:
-                num_hours += 0.5
-                remaining_seconds = 0
-
             if num_hours:
                 plural = "" if num_hours == 1 else "s"
                 result.append("%s hour%s" % (num_hours, plural))
