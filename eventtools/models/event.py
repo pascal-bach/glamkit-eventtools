@@ -388,23 +388,26 @@ class EventModel(MPTTModel):
 
     def is_cancelled(self):
         """Return True if all occurrences are cancelled"""
-        return self.occurrences_in_listing().count() == self.cancelled_occurrences().count()
+        cancelled = self.cancelled_occurrences().count()
+        return cancelled > 0 and self.occurrences_in_listing().count() == cancelled
 
     def forthcoming_is_cancelled(self):
         """Return True if all forthcoming occurrences are cancelled"""
-        return self.occurrences_in_listing().forthcoming().count() == self.cancelled_occurrences().forthcoming().count()
+        forthcoming = self.occurrences_in_listing().forthcoming().count()
+        cancelled_forthcoming = self.cancelled_occurrences().forthcoming().count()
+        return cancelled_forthcoming > 0 and forthcoming == cancelled_forthcoming
 
     def is_fully_booked(self):
         """
         Return True if no occurrences are available and at least one is fully booked. (a mix of cancelled and fully booked is allowed)
         """
-        return self.available_occurrences().count() == 0 and self.fully_booked_occurrences().count > 0
+        return self.available_occurrences().count() == 0 and self.fully_booked_occurrences().count() > 0
 
     def forthcoming_is_fully_booked(self):
         """
         Return True if no forthcoming occurrences are available and at least one is fully booked. (a mix of cancelled and fully booked is allowed)
         """
-        return self.available_occurrences().forthcoming().count() == 0 and self.fully_booked_occurrences().forthcoming().count > 0
+        return self.available_occurrences().forthcoming().count() == 0 and self.fully_booked_occurrences().forthcoming().count() > 0
 
     def is_available(self):
         """
