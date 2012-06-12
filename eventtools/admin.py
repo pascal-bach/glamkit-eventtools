@@ -228,7 +228,7 @@ def EventForm(EventModel):
             model = EventModel
     return _EventForm
 
-def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
+def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False, show_generator=True):
     """ pass in the name of your EventModel subclass to use this admin. """
     
     class _EventAdmin(SuperModel):
@@ -241,8 +241,10 @@ def EventAdmin(EventModel, SuperModel=MPTTModelAdmin, show_exclusions=False):
         def append_eventtools_inlines(self, inline_instances):
             eventtools_inlines = [
                 OccurrenceInline(EventModel.OccurrenceModel()),
-                GeneratorInline(EventModel.GeneratorModel()),
             ]
+            if show_generator:
+                eventtools_inlines.append(GeneratorInline(EventModel.GeneratorModel()))
+
             if show_exclusions:
                 eventtools_inlines.append(ExclusionInline(EventModel.ExclusionModel()))
             
