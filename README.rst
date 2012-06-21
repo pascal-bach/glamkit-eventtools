@@ -10,13 +10,10 @@ It is a fork of the popular django-schedule app.
 
 Features:
 
- * one-time and recurring events
- * calendar exceptions (occurrences changed or cancelled)
- * occurrences accessible through Event API, Period API and Django Admin
- * ready to use, nice user interface
- * flexible calendar template tags
- * project sample which can be launched immediately and reused in your project
+ * Events have several Occurrences. You define the non-essential fields.
+ * Handles one-time and repeating Occurrences.
+ * Can exclude particular times from repeating occurrences.
+ * Ready to use, nice user interface
+ * Flexible calendar template tags
 
 Please read the `documentation <http://docs.glamkit.org/eventtools/>`_.
-
-Dependencies: python-vobject, dateutils

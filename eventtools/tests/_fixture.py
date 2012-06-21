@@ -5,14 +5,9 @@ from eventtools.utils.dateranges import *
 from datetime import datetime, date, timedelta
 
 def fixture(obj):
-    obj.gallery = ExampleVenue.objects.create(name="Gallery A", slug="gallery-A")
-    obj.auditorium = ExampleVenue.objects.create(name="Auditorium", slug="auditorium")
-    obj.cinema_1 = ExampleVenue.objects.create(name="Cinema 1", slug="cinema-1")
-    obj.cinema_2 = ExampleVenue.objects.create(name="Cinema 2", slug="cinema-2")
-    
     #some simple events
-    obj.talk = ExampleEvent.eventobjects.create(title="Curator's Talk", slug="curators-talk", venue=obj.gallery)
-    obj.performance = ExampleEvent.eventobjects.create(title="A performance", slug="performance", venue=obj.auditorium)
+    obj.talk = ExampleEvent.eventobjects.create(title="Curator's Talk", slug="curators-talk")
+    obj.performance = ExampleEvent.eventobjects.create(title="A performance", slug="performance")
     
     #some useful dates
     obj.day1 = date(2010,10,10)
@@ -39,14 +34,14 @@ def fixture(obj):
     obj.weekly_talk = ExampleEvent.eventobjects.create(title="Weekly Talk", slug="weekly-talk")
     for day in range(50):
         d = date(2010,1,1) + timedelta(day*7)
-        obj.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), end=datetime.combine(d, time(12,00)))
+        obj.weekly_talk.occurrences.create(start=datetime.combine(d, time(10,00)), _duration=240)
 
 
     #an event with some variations
-    obj.film = ExampleEvent.eventobjects.create(title="Film Night", slug="film-night", venue=obj.cinema_1)
-    obj.film_with_popcorn = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-2", difference_from_parent="free popcorn", venue=obj.cinema_1)
-    obj.film_with_talk = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-talk", difference_from_parent="director's talk", venue=obj.auditorium)
-    obj.film_with_talk_and_popcorn = ExampleEvent.eventobjects.create(parent=obj.film_with_talk, title="Film Night", slug="film-with-talk-and-popcorn", difference_from_parent="popcorn and director's talk", venue=obj.cinema_2)
+    obj.film = ExampleEvent.eventobjects.create(title="Film Night", slug="film-night")
+    obj.film_with_popcorn = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-2", difference_from_parent="free popcorn")
+    obj.film_with_talk = ExampleEvent.eventobjects.create(parent=obj.film, title="Film Night", slug="film-night-talk", difference_from_parent="director's talk")
+    obj.film_with_talk_and_popcorn = ExampleEvent.eventobjects.create(parent=obj.film_with_talk, title="Film Night", slug="film-with-talk-and-popcorn", difference_from_parent="popcorn and director's talk")
     
     # obj.film_with_popcorn.move_to(obj.film, position='first-child')
     # obj.film_with_talk.move_to(obj.film, position='first-child')
@@ -67,13 +62,13 @@ def generator_fixture(obj):
     obj.yearly = Rule.objects.create(frequency = "YEARLY")
     obj.bin_night = ExampleEvent.eventobjects.create(title='Bin Night')
     
-    obj.weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+    obj.weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), _duration=60, rule=obj.weekly, repeat_until=date(2010,2,5))
     #this should create 0 occurrences, since it is a duplicate of weekly.
-    obj.dupe_weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+    obj.dupe_weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), _duration=60, rule=obj.weekly, repeat_until=date(2010,2,5))
 
-    obj.endless_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,2,10,30), event_end=datetime(2010,1,2,11,30), rule=obj.weekly)
+    obj.endless_generator = obj.bin_night.generators.create(start=datetime(2010,1,2,10,30), _duration=60, rule=obj.weekly)
 
-    obj.all_day_generator = obj.bin_night.generators.create(event_start=date(2010,1,4), rule=obj.weekly, repeat_until=date(2010,1,25))
+    obj.all_day_generator = obj.bin_night.generators.create(start=datetime(2010,1,4,0,0), rule=obj.weekly, repeat_until=date(2010,1,25))
     
 def reload_films(obj):
     obj.film = obj.film.reload()

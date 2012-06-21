@@ -9,6 +9,7 @@ from dateutil.relativedelta import *
 from django import template
 from django.template.context import RequestContext
 from django.template import TemplateSyntaxError
+from django.core.urlresolvers import reverse
 
 from eventtools.conf import settings as eventtools_settings
 from eventtools.models import EventModel, OccurrenceModel
@@ -27,11 +28,11 @@ def DATE_HREF_FACTORY(test_dates=True, dates=[]):
         Given a day, return a URL to navigate to.
         """
         if (test_dates and day in dates) or (not test_dates):
-            return ".?startdate=%s-%s-%s" % (
+            return reverse('events:on_date', args=(
                 day.year, 
                 day.month,
                 day.day,
-            )
+            ))
         return None
     return f
 
@@ -206,7 +207,7 @@ def nav_calendar(
     )
 
 def nav_calendars(
-        context, occurrence_qs=[],
+        context, occurrence_qs=[], selected_occurrence=None,
         date_href_fn=None,
         date_class_fn=None,
     ):
@@ -218,8 +219,12 @@ def nav_calendars(
     #TODO: allow dates, not just occurrence_qs
     if date_class_fn is None and occurrence_qs:
         occurrence_days = [o.start.date() for o in occurrence_qs]
-        date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, None)
-    
+        if selected_occurrence:
+            date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, selected_occurrence.start.date())
+        else:
+            date_class_fn = DATE_CLASS_HIGHLIGHT_FACTORY(occurrence_days, None)
+
+
     calendars = []
     if occurrence_qs.count() > 0:
         first_date = occurrence_qs[0].start.date()

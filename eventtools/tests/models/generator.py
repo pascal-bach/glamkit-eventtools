@@ -64,14 +64,14 @@ class TestGenerators(AppTestCase):
         
     def test_all_day(self):
         """
-        If the start time of a generator is time.min and the end time is time.max, then the generator generates all_day
+        If the start time of a generator is time.min and the duration is not given, then the generator generates all_day
         occurrences.
         """
         
-        self.ae(self.all_day_generator.event_start, datetime(2010, 1, 4, 0, 0))
-        self.ae(self.all_day_generator.event_end, datetime.combine(date(2010,1,4), time.max) )
+        self.ae(self.all_day_generator.start, datetime(2010, 1, 4, 0, 0))
+        self.assertTrue(not self.all_day_generator._duration)
     
-        [self.ae(x.all_day, True) for x in self.all_day_generator.occurrences.all()]
+        [self.ae(x.all_day(), True) for x in self.all_day_generator.occurrences.all()]
                 
     def test_creation(self):
         """
@@ -92,102 +92,36 @@ class TestGenerators(AppTestCase):
         dt2 = datetime.combine(d2, t2)
 
         #datetimes
-        g = e.generators.create(event_start=dt1, event_end=d1max, rule=self.yearly)
-        self.ae(g.event_start, dt1)
-        self.ae(g.event_end, d1max)
+        g = e.generators.create(start=dt1, _duration=60*24+60, rule=self.yearly)
+        self.ae(g.start, dt1)
+        self.ae(g.end(), dt2)
 
-        g = e.generators.create(event_start=dt1, rule=self.yearly)
-        self.ae(g.event_start, dt1)
-        self.ae(g.event_end, dt1)
+        g = e.generators.create(start=dt1, rule=self.yearly)
+        self.ae(g.start, dt1)
+        self.ae(g.end(), dt1)
 
-        g = e.generators.create(event_start=d1min, rule=self.yearly)
-        self.ae(g.event_start, d1min)
-        self.ae(g.event_end, d1max)
+        g = e.generators.create(start=d1min, rule=self.yearly)
+        self.ae(g.start, d1min)
+        self.ae(g.end(), d1min)
 
-        
-        #dates
-        g = e.generators.create(event_start=d1, rule=self.yearly)
-        self.ae(g.event_start, d1min)
-        self.ae(g.event_end, d1max)
-
-        g = e.generators.create(event_start=d1, event_end=d2, rule=self.yearly)
-        self.ae(g.event_start, d1min)
-        self.ae(g.event_end, d2max)
-
-        #combos
-        g = e.generators.create(event_start=dt1, event_end=d2, rule=self.yearly)
-        self.ae(g.event_start, dt1)
-        self.ae(g.event_end, d2max)
-        
-        g = e.generators.create(event_start=d1, event_end=dt2, rule=self.yearly)
-        self.ae(g.event_start, d1min)
-        self.ae(g.event_end, dt2)
-        
-        # Missing event_start date.
+        # Missing start.
         self.assertRaises(
-            TypeError,
-            e.generators.create, **{'event_end':dt1, 'rule': self.yearly}    
-        )
-        self.assertRaises(
-            TypeError,
-            e.generators.create, **{'event_end':d1, 'rule': self.yearly}
+            Exception,
+            e.generators.create, **{'_duration': 60, 'rule': self.yearly}
         )
 
         # Missing rule.
         self.assertRaises(
-            AttributeError,
-            e.generators.create, **{'event_start':dt1, }    
+            Exception,
+            e.generators.create, **{'start':dt1, }    
         )
 
-        
-        # Invalid event_start value.
+        # Invalid start value.
         self.assertRaises(
-            TypeError, 
-            e.generators.create, **{'event_start':t1, 'rule': self.yearly}
-        )
-        self.assertRaises(
-            TypeError,
-            e.generators.create,
-            event_start=t1,
-            event_end=d1, rule=self.yearly
-        )
-        self.assertRaises(
-            TypeError,
-            e.generators.create,
-            event_start=t1,
-            event_end=dt1, rule=self.yearly
+            Exception,
+            e.generators.create, **{'start':t1, 'rule': self.yearly}
         )
 
-        # Invalid event_end values.
-        self.assertRaises(TypeError,
-            e.generators.create, **{'event_end':t1, 'rule': self.yearly})
-        self.assertRaises(TypeError,
-            e.generators.create, event_start=d1, event_end=t1, rule=self.yearly)
-        self.assertRaises(TypeError,
-            e.generators.create, event_start=dt1, event_end=t2, rule=self.yearly)
-        
-         # event_start date later than event_end date.
-        self.assertRaises(
-            AttributeError,
-            e.generators.create,
-            event_start=dt2,
-            event_end=dt1,
-            rule=self.yearly
-        )
-        self.assertRaises(
-            AttributeError,
-            e.generators.create,
-            event_start=d2, event_end=dt1, rule=self.yearly
-        )
-        self.assertRaises(AttributeError,
-            e.generators.create, event_start=d2, event_end=d1, rule=self.yearly
-        )
-
-        # user error: making an event that lasts longer than a day repeat daily
-        self.assertRaises(AttributeError,
-            e.generators.create, event_start=dt1, event_end=dt2, rule=self.daily
-        )
-    
     def test_clash(self):
         """
         weekly_generator and endless_generator are set up to generate clashing
@@ -208,10 +142,10 @@ class TestGenerators(AppTestCase):
         self.furniture_collection.occurrences.all().delete()
         self.furniture_collection.generators.all().delete()
         self.changeable_generator = self.furniture_collection.generators.create(
-            event_start=datetime(2010, 12, 27, 8, 30),
-            event_end=datetime(2010, 12, 27, 9, 30),
+            start=datetime(2010, 12, 27, 8, 30),
+            _duration=60,
             rule=self.weekly,
-            repeat_until=datetime(2011, 2, 2, 23, 59, 59)
+            repeat_until=date(2011, 2, 2)
         )
 
         # assert count
@@ -227,7 +161,7 @@ class TestGenerators(AppTestCase):
         # assert initial day of the week
         [self.ae(x.start.weekday(), 0) \
             for x in self.original_generated_occurrences]
-        [self.ae(x.end.weekday(), 0) \
+        [self.ae(x.end().weekday(), 0) \
             for x in self.original_generated_occurrences]
                 
                 
@@ -243,9 +177,9 @@ class TestGenerators(AppTestCase):
         # =================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date(),
+                self.changeable_generator.start.date(),
                 time(9,00)
             )
         self.changeable_generator.save()
@@ -256,8 +190,8 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
-        # assert new duration
-        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 0) \
@@ -268,9 +202,9 @@ class TestGenerators(AppTestCase):
         # ===================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date(),
+                self.changeable_generator.start.date(),
                 time(8,00)
             )
         self.changeable_generator.save()
@@ -281,8 +215,8 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
-        # assert new duration
-        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 0) \
@@ -293,9 +227,9 @@ class TestGenerators(AppTestCase):
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() - timedelta(1),
+                self.changeable_generator.start.date() - timedelta(1),
                 time(9,00)
             )
         self.changeable_generator.save()
@@ -306,8 +240,8 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
-        # assert new duration (24.5h)
-        [self.ae(x.duration, timedelta(days=1, seconds=1800)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 6) \
@@ -318,9 +252,9 @@ class TestGenerators(AppTestCase):
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() - timedelta(1),
+                self.changeable_generator.start.date() - timedelta(1),
                 time(8,00)
             )
         self.changeable_generator.save()
@@ -331,8 +265,8 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
-        # assert new duration (25.5h)
-        [self.ae(x.duration, timedelta(days=1, seconds=5400)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 6) \
@@ -343,9 +277,9 @@ class TestGenerators(AppTestCase):
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() - timedelta(2),
+                self.changeable_generator.start.date() - timedelta(2),
                 time(8,00)
             )
         self.changeable_generator.save()
@@ -356,8 +290,8 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
-        # assert new duration (25.5h)
-        [self.ae(x.duration, timedelta(days=2, seconds=5400)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 5) \
@@ -365,19 +299,13 @@ class TestGenerators(AppTestCase):
 
         # =============================================================
         # changing start time nearly 24h later, to 0800 the day after
-        # (end time is also updated for integrity) 
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() + timedelta(1),
+                self.changeable_generator.start.date() + timedelta(1),
                 time(8,00)
-            )
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() + timedelta(1),
-                time(9,30)
             )
         self.changeable_generator.save()
         
@@ -391,8 +319,8 @@ class TestGenerators(AppTestCase):
 
         # assert new times
         [self.ae(x.start.time(), time(8,00)) for x in new_occurrences]
-        # assert new duration (23.5h)
-        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 1) \
@@ -400,19 +328,13 @@ class TestGenerators(AppTestCase):
   
         # =============================================================
         # changing start time more than 24h later to 0900 the day after 
-        # (end time is also updated for integrity) 
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() + timedelta(1),
+                self.changeable_generator.start.date() + timedelta(1),
                 time(9,00)
-            )
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() + timedelta(1),
-                time(9,30)
             )
         self.changeable_generator.save()
         
@@ -426,28 +348,22 @@ class TestGenerators(AppTestCase):
 
         # assert new times
         [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
-        # assert new duration (23.5h)
-        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 1) \
             for x in new_occurrences]
     
         # =============================================================
-        # changing start time more than 48h later to 0900 2 days after 
-        # (end time is also updated for integrity) 
+        # changing start time more than 48h later to 0900 2 days after
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_start = \
+        self.changeable_generator.start = \
             datetime.combine(
-                self.changeable_generator.event_start.date() + timedelta(2),
+                self.changeable_generator.start.date() + timedelta(2),
                 time(9,00)
-            )
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() + timedelta(2),
-                time(9,30)
             )
         self.changeable_generator.save()
         
@@ -461,31 +377,27 @@ class TestGenerators(AppTestCase):
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
         [self.ae(x.start.time(), time(9,00)) for x in new_occurrences]
-        # assert new duration (23.5h)
-        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
+        # assert same duration
+        [self.ae(x.duration, timedelta(days=0, seconds=3600)) \
             for x in new_occurrences]
         # assert new day of the week
         [self.ae(x.start.weekday(), 2) \
             for x in new_occurrences]
 
-    def test_end_changes(self):     
+    def test_duration_changes(self):
         """
-        test the effects of changing end date/time.
+        test the effects of changing duration date/time.
         
         (If only end datetime is changed, we'll never end up with 'orphan' 
         occurrences.)
         """
     
         # =================================
-        # changing end time later to 1000
+        # changing duration later to 1000
         # =================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date(),
-                time(10,00)
-            )
+        self.changeable_generator._duration = 90
         self.changeable_generator.save()
         
         new_occurrences = self.changeable_generator.occurrences.all()
@@ -493,24 +405,20 @@ class TestGenerators(AppTestCase):
         # assert ids haven't changed
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
-        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
+        [self.ae(x.end().time(), time(10,00)) for x in new_occurrences]
         # assert new duration
         [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
             for x in new_occurrences]
         # assert new day of the week
-        [self.ae(x.end.weekday(), 0) \
+        [self.ae(x.end().weekday(), 0) \
             for x in new_occurrences]
     
         # ===================================
-        # changing end time earlier to 0900
+        # changing duration earlier to 0900
         # ===================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date(),
-                time(9,00)
-            )
+        self.changeable_generator._duration = 30
         self.changeable_generator.save()
         
         new_occurrences = self.changeable_generator.occurrences.all()
@@ -518,24 +426,21 @@ class TestGenerators(AppTestCase):
         # assert ids haven't changed
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
-        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
+        [self.ae(x.end().time(), time(9,00)) for x in new_occurrences]
         # assert new duration
         [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
             for x in new_occurrences]
         # assert new day of the week
-        [self.ae(x.end.weekday(), 0) \
+        [self.ae(x.end().weekday(), 0) \
             for x in new_occurrences]
     
         # =============================================================
-        # changing end time nearly 24h later to 0900 the day after 
+        # changing duration nearly 24h later to 0900 the day after
+        # (start time = 8.30)
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() + timedelta(1),
-                time(9,00)
-            )
+        self.changeable_generator._duration = 1470
         self.changeable_generator.save()
         
         new_occurrences = self.changeable_generator.occurrences.all()
@@ -543,24 +448,20 @@ class TestGenerators(AppTestCase):
         # assert ids haven't changed
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
-        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
+        [self.ae(x.end().time(), time(9,00)) for x in new_occurrences]
         # assert new duration (24.5h)
         [self.ae(x.duration, timedelta(days=1, seconds=1800)) \
             for x in new_occurrences]
         # assert new day of the week
-        [self.ae(x.end.weekday(), 1) \
+        [self.ae(x.end().weekday(), 1) \
             for x in new_occurrences]
       
         # =============================================================
-        # changing end time more than 24h later to 1000 the day after 
+        # changing duration more than 24h later to 1000 the day after
         # =============================================================
         self._reset_generator_fixture()
             
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() + timedelta(1),
-                time(10,00)
-            )
+        self.changeable_generator._duration = 1530
         self.changeable_generator.save()
         
         new_occurrences = self.changeable_generator.occurrences.all()
@@ -568,79 +469,14 @@ class TestGenerators(AppTestCase):
         # assert ids haven't changed
         self.ae(new_ids, self.original_generated_occurrence_ids)
         # assert new times
-        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
+        [self.ae(x.end().time(), time(10,00)) for x in new_occurrences]
         # assert new duration (25.5h)
         [self.ae(x.duration, timedelta(days=1, seconds=5400)) \
             for x in new_occurrences]
         # assert new day of the week
-        [self.ae(x.end.weekday(), 1) \
+        [self.ae(x.end().weekday(), 1) \
             for x in new_occurrences]
     
-        # =============================================================
-        # changing end time nearly 24h earlier, to 1000 the day before
-        # (start time is also updated for integrity) 
-        # =============================================================
-        self._reset_generator_fixture()
-            
-        self.changeable_generator.event_start = \
-            datetime.combine(
-                self.changeable_generator.event_start.date() - timedelta(1),
-                time(8,30)
-            )
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() - timedelta(1),
-                time(10,00)
-            )
-        self.changeable_generator.save()
-        
-        new_occurrences = self.changeable_generator.occurrences.all()
-        new_ids = set([x.id for x in new_occurrences])
-        # assert ids haven't changed
-        self.ae(new_ids, self.original_generated_occurrence_ids)
-    
-        # assert new times
-        [self.ae(x.end.time(), time(10,00)) for x in new_occurrences]
-        # assert new duration (1.5h)
-        [self.ae(x.duration, timedelta(days=0, seconds=5400)) \
-            for x in new_occurrences]
-        # assert new day of the week
-        [self.ae(x.end.weekday(), 6) \
-            for x in new_occurrences]
-      
-        # =============================================================
-        # changing end time more than 24h earlier to 0900 the day before 
-        # (start time is also updated for integrity) 
-        # =============================================================
-        self._reset_generator_fixture()
-            
-        self.changeable_generator.event_start = \
-            datetime.combine(
-                self.changeable_generator.event_start.date() - timedelta(1),
-                time(8,30)
-            )
-        self.changeable_generator.event_end = \
-            datetime.combine(
-                self.changeable_generator.event_end.date() - timedelta(1),
-                time(9,00)
-            )
-        self.changeable_generator.save()
-        
-        new_occurrences = self.changeable_generator.occurrences.all()
-        new_ids = set([x.id for x in new_occurrences])
-        # assert ids haven't changed
-        self.ae(new_ids, self.original_generated_occurrence_ids)
-    
-        # assert new times
-        [self.ae(x.end.time(), time(9,00)) for x in new_occurrences]
-        # assert new duration (0.5h)
-        [self.ae(x.duration, timedelta(days=0, seconds=1800)) \
-            for x in new_occurrences]
-        # assert new day of the week
-        [self.ae(x.end.weekday(), 6) \
-            for x in new_occurrences]    
-
-
         # updating a generator should update other generators, in case their times clashed.
     def test_clashing_generators(self):
         """
@@ -648,8 +484,8 @@ class TestGenerators(AppTestCase):
         then the other should create occurrences.
         
         # in the fixture, these two generators are identical
-        obj.weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
-        obj.dupe_weekly_generator = obj.bin_night.generators.create(event_start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+        obj.weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
+        obj.dupe_weekly_generator = obj.bin_night.generators.create(start=datetime(2010,1,8,10,30), event_end=datetime(2010,1,8,11,30), rule=obj.weekly, repeat_until=date(2010,2,5))
 
         """
         
@@ -661,11 +497,61 @@ class TestGenerators(AppTestCase):
         self.assertTrue(dupe_weekly_count == 0)
 
         #Shift the weekly start forward 30 mins.
-        self.weekly_generator.event_start = datetime(2010,1,8,11,00)
+        self.weekly_generator.start = datetime(2010,1,8,11,00)
         self.weekly_generator.save()
         #should no longer clash
         self.ae(self.weekly_generator.occurrences.count(), weekly_count)
         self.ae(self.dupe_weekly_generator.occurrences.count(), weekly_count)
         
-        
-        
+
+    def test_regenerate_with_related_items(self):
+        event = ExampleEvent.objects.create(title="Curator's Talk", slug="curators-talk-1")
+        # is on every week for a year
+        weekly = Rule.objects.create(frequency = "WEEKLY")
+        generator = event.generators.create(start=datetime(2010,1,1, 9,00), _duration=60, rule=weekly, repeat_until=date(2010,12,31))
+
+        # that means there are 53 occurrences generated
+        self.ae(generator.occurrences.count(), 53)
+        # and one of them is on a particular date
+        ticketed_occurrence = event.occurrences.all().reverse()[0]
+        # now I buy a ticket to the occurrence
+        ticket = ExampleTicket.objects.create(occurrence=ticketed_occurrence)
+
+        # oh wait, I made a data entry mistake! The talk is on every week only for 6 months
+        generator.repeat_until = date(2010, 7, 1)
+        generator.save()
+        # that means there are 26 occurrences generated
+        self.ae(generator.occurrences.count(), 26)
+
+        # since I bought a ticket, the occurrence that has a ticket is now one-off
+        self.assertTrue(ticket.occurrence)
+        self.ae(event.occurrences.get(id=ticket.occurrence.id).generated_by, None)
+
+        # but there are no other one-off occurrences, meaning 27 occurrences in total
+        self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
+        self.ae(event.occurrences.count(), 27)
+
+    def test_delete_with_related_items(self):
+        event = ExampleEvent.objects.create(title="Curator's Talk", slug="curators-talk-2")
+        # is on every week for a year
+        generator = event.generators.create(start=datetime(2010,1,1, 9,00), _duration=60, rule=self.weekly_generator.rule, repeat_until=date(2010,12,31))
+
+        # that means there are 53 occurrences generated
+        self.ae(generator.occurrences.count(), 53)
+        # and one of them is on a particular date
+        ticketed_occurrence = event.occurrences.all().reverse()[0]
+        # now I buy a ticket to the occurrence
+        ticket = ExampleTicket.objects.create(occurrence=ticketed_occurrence)
+
+        # oh wait, I made a data entry mistake! Deleting the generator.
+        generator.delete()
+
+        # since I bought a ticket, the occurrence that has a ticket is now one-off.
+        ticket = ExampleTicket.objects.get(pk=ticket.pk)
+        self.assertTrue(ticket.occurrence)
+        self.ae(ticket.occurrence.generated_by, None)
+
+        # but there are no other one-off occurrences, meaning 1 occurrence in total
+        self.ae(event.occurrences.filter(generated_by__isnull=True).count(), 1)
+        self.ae(event.occurrences.count(), 1)
+

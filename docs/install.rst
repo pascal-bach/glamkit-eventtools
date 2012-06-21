@@ -4,7 +4,7 @@
 Getting The Code
 ================
 
-The project is available through `Github <http://github.com/glamkit/glamkit-events/tree>`_.
+The project is available through `Github <http://github.com/glamkit/glamkit-eventtools/>`_.
 
 .. _ref-configure:
 
@@ -12,50 +12,103 @@ The project is available through `Github <http://github.com/glamkit/glamkit-even
 Configuration
 =============
 
-1. Add ``eventtools`` to your ``INSTALLED_APPS``
-
-2. Add ``(r'^events/', include('events.urls')),`` to your urls.py (changing ``r`^events/'`` to whatever url pattern you'd like glamkit-events to live at)
-
-3. Resync your database ``./manage.py syncdb``
- 
-
-
-
-
-
 Installation
 ------------
 
-Download the code; put it into your project's directory or run ``python setup.py install`` to install system-wide.
+0. Download the code; put it into your project's directory or run ``python setup.py install`` to install to your envirnoment.
 
-REQUIREMENTS: python-vobject (comes with most distribution as a package).
+1. Install the requirements (using pip).
+
+    pip install -e REQUIREMENTS.txt
+
+2. Create an `events` app, where you will define what Events look like for your project.
+
+    ./manage.py startapp events
+
+The app doesn't have to be called `events`, but it will make the rest of these
+instructions easier to follow.
 
 Settings.py
 -----------
 
-REQUIRED
-^^^^^^^^
+3. List the required applications in the ``INSTALLED_APPS`` portion of your settings
+   file.  Your settings file might look something like::
+   
+       INSTALLED_APPS = (
+           # ...
+           'mptt'
+           'eventtools',
+           'events', # the name of your app.
+       )
 
-`INSTALLED_APPS` - add: 
-    'events',
+4. Install the pagination middleware.  Your settings file might look something
+   like::
+   
+       MIDDLEWARE_CLASSES = (
+           # ...
+           'pagination.middleware.PaginationMiddleware',
+       )
 
-`TEMPLATE_CONTEXT_PROCESSORS` - add:
-    "django.core.context_processors.request",
+Models Definition
+-----------------
 
-Optional
-^^^^^^^^
+5. Define models in your new app. We suggest calling the Event model 'Event'
+to easily use the provided templates. In ``events/models.py``:
 
-`FIRST_DAY_OF_WEEK`
+    from django.db import models
+    from eventtools.models import EventModel, OccurrenceModel, GeneratorModel #, ExclusionModel
 
-This setting determines which day of the week your calendar begins on if your locale doesn't already set it. Default is 0, which is Sunday.
+    class Event(EventModel):
+        teaser = models.TextField(blank=True)
+        image = models.ImageField(upload_to="events_uploads", blank=True)
+        #etc
 
-`OCCURRENCE_CANCEL_REDIRECT`
+    class Generator(GeneratorModel):
+        event = models.ForeignKey(Event, related_name="generators")
 
-This setting controls the behaviour of :func:`Views.get_next_url`. If set, all calendar modifications will redirect here (unless there is a `next` set in the request.)
+    class Occurrence(OccurrenceModel):
+        event = models.ForeignKey(Event, related_name="occurrences")
+        generated_by = models.ForeignKey(Generator, blank=True, null=True, related_name="occurrences")
 
-`SHOW_CANCELLED_OCCURRENCES`
+    class Exclusion(ExclusionModel):
+        event = models.ForeignKey(Event, related_name="exclusions")
 
-This setting controls the behaviour of :func:`Period.classify_occurence`. If True, then occurrences that have been cancelled will be displayed with a CSS class of cancelled, otherwise they won't appear at all.
+Admin
+-----
 
-Defaults to False
+6. Set up admin. In ``events/admin.py``:
 
+    from django.contrib import admin
+    from eventtools.admin import EventAdmin, OccurrenceAdmin
+    from .models import Event, Occurrence
+
+    admin.site.register(Event, EventAdmin(Event), show_exclusions=True)
+    admin.site.register(Occurrence, OccurrenceAdmin(Occurrence))
+
+Views and URLs
+--------------
+    
+7. Set up view URLs. In ``events/urls.py``
+
+    from django.conf.urls.defaults import *
+    from eventtools.views import EventViews
+    from .models import Event
+
+    views = EventViews(event_qs=Event.eventobjects.all())
+
+    urlpatterns = patterns('',
+        url(r'^', include(views.urls)),
+    )
+    
+8. In your main ``urls.py``:
+
+    urlpatterns += patterns('',
+        url(r'^events/', include('events.urls')),    
+    )
+   
+Nearly there
+------------
+    
+8. syncdb/migrate, then collectstatic
+
+9. try it! Visit http://yourserver/events/

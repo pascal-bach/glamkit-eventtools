@@ -1,4 +1,5 @@
 <span class="vevent">
-<h3><a href="{{ event.get_absolute_url }}" class="summary">{{ event.title }}</a> </h3>
+<h3><a href="{{ event.get_absolute_url }}" class="summary">{{ event.title }}</a></h3>
 <p class="season">{{ event.season }}</p>
+{% if event.status_message %}<p class="status"{{ event.status_message }}</p>{% endif %}
 </span>

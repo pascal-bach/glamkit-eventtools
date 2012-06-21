@@ -3,7 +3,7 @@ From http://fragmentsofcode.wordpress.com/2009/02/24/django-fully-qualified-url/
 
 This is used by eventtools to get absolute URLs for ics files
 
-- to go into glamkit-convenient someday?
+TODO: go into glamkit-convenient someday?
 """
 
 from django.conf import settings

@@ -5,67 +5,66 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 from django.core import exceptions
 
 from dateutil import rrule
+from eventtools.models.xtimespan import XTimespanModel
 
-from eventtools.utils import datetimeify
 from eventtools.conf import settings
 from eventtools.utils.pprint_timespan import (
     pprint_datetime_span, pprint_date_span)
 
 from datetime import date, time, datetime, timedelta
 
-class GeneratorModel(models.Model):
+class GeneratorModel(XTimespanModel):
     """
-    Generates occurrences.
+    Stores information about repeating Occurrences, and generates them,
+    unless they already exist, or match an Exception.
+    
+    The public API is quite simple:
+    
+    save() generates Occurrences.
+    
+    clean() makes sure the Generator has valid values (and is called by admin
+    before the instance is saved)
+       
+    robot_description() attempts to provide an English description of this
+    generator. It's not great at the moment and might be replaced or deprecated
+    in favour of a hand-written description in the Event.
+    
+    EventModel() returns the Model of the Event that this Generator links to.
     """
 
     #define a FK called 'event' in the subclass
-    event_start = models.DateTimeField(db_index=True)
-    event_end = models.DateTimeField(blank=True, db_index=True)
     rule = models.ForeignKey("eventtools.Rule")
-    repeat_until = models.DateTimeField(null = True, blank = True, help_text=_(u"These start dates are ignored for one-off events."))
+    repeat_until = models.DateField(
+        null=True, blank = True,
+        help_text=_(u"Occurrences will repeat up to and including this date. If ommitted, the next year's worth of "
+            "occurrences will be created."
+        )
+    )
 
     class Meta:
         abstract = True
-        ordering = ('event_start',)
+        ordering = ('start',)
         verbose_name = "repeating occurrence"
         verbose_name_plural = "repeating occurrences"
 
     def __unicode__(self):
         return u"%s, %s" % (self.event, self.robot_description())
-    
+        
+    @classmethod
+    def EventModel(cls):
+        return cls._meta.get_field('event').rel.to
+        
     def clean(self, ExceptionClass=exceptions.ValidationError):
-        if self.event_end is None:
-            self.event_end = self.event_start
-    
-        self.event_start = datetimeify(self.event_start, clamp="min")
-        self.event_end = datetimeify(self.event_end, clamp="max")
-        if self.repeat_until is not None:
-            self.repeat_until = datetimeify(self.repeat_until, clamp="max")
-
-        if self.event_end.time == time.min:
-            self.event_end.time == time.max
-
+        super(GeneratorModel, self).clean()
         if not self.rule_id:
-            raise ExceptionClass('a rule must be supplied')
+            raise ExceptionClass('A Rule must be given')
     
-        if self.event_start > self.event_end:
-            raise ExceptionClass('start must be earlier than end')
-        if self.repeat_until is not None and \
-                self.repeat_until < self.event_end:
+        if self.start and self.repeat_until and self.repeat_until < self.start.date():
             raise ExceptionClass(
-                'repeat_until must not be earlier than start')
-        # This data entry mistake is common enough to justify a slight hack.
-        if self.rule.frequency == 'DAILY' \
-                and self.event_duration() > timedelta(1):
-            raise ExceptionClass(
-                'Daily events cannot span multiple days; the event start and \
-                end dates should be the same.'
-            )
+                'Repeat until date must not be earlier than start date')
             
         self.is_clean = True
-        super(GeneratorModel, self).clean()
-    
-    
+
     @transaction.commit_on_success()
     def save(self, *args, **kwargs):
         """
@@ -94,7 +93,6 @@ class GeneratorModel(models.Model):
         # Occurrences updates/generates
         if self.pk:
             self._update_existing_occurrences() # need to do this before save, so we can detect changes
-
         r = super(GeneratorModel, self).save(*args, **kwargs)
         self._sync_occurrences() #need to do this after save, so we have a pk to hang new occurrences from.
     
@@ -106,21 +104,11 @@ class GeneratorModel(models.Model):
         
         return r
         
-    def event_duration(self):
-        return self.event_end-self.event_start
-    
-    @classmethod
-    def EventModel(cls):
-        return cls._meta.get_field('event').rel.to
-        
     def _generate_dates(self):
-        if self.rule is None:
-            yield self.event_start
-            raise StopIteration
-        
-        rule = self.rule.get_rrule(dtstart=self.event_start)
+        rule = self.rule.get_rrule(dtstart=self.start)
         date_iter = iter(rule)
-        drop_dead_date = self.repeat_until or datetime.now() + settings.DEFAULT_GENERATOR_LIMIT
+        drop_dead_date = datetime.combine(self.repeat_until or date.today() \
+            + settings.DEFAULT_GENERATOR_LIMIT, time.max)
                 
         while True:
             d = date_iter.next()
@@ -134,13 +122,13 @@ class GeneratorModel(models.Model):
         When you change a generator and save it, it updates existing occurrences
         according to the following rules:
         
-        Generally, we never automatically delete occurrences, we unhook them
-        from the generator, and make them manual. This is to prevent losing
-        information like tickets sold or shout-outs. We leave implementors to
-        decide the workflow in these cases. We want to minimise the number of
-        events that are unhooked, however. So:
+        Generally, if we can't automatically delete occurrences, we unhook them
+        from the generator, and make them one-off. This is to prevent losing
+        information like tickets sold or shout-outs (we leave implementors to
+        decide the workflow in these cases). We want to minimise the number of
+        events that are deleted or unhooked, however. So:
     
-         * If start time or end date or time is changed, then no occurrences are
+         * If start time or duration is changed, then no occurrences are
            added or removed - we timeshift all occurrences. We assume that
            visitors/ticket holders are alerted to the time change elsewhere.
     
@@ -151,7 +139,7 @@ class GeneratorModel(models.Model):
          * Occurrences that are added are fine, they are added in the normal
            way.
            
-         * Occurrences that are removed are unhooked, for reasons
+         * Occurrences that are removed are deleted or unhooked, for reasons
            described above.
         """
         
@@ -161,12 +149,13 @@ class GeneratorModel(models.Model):
             update the start times of my occurrences
         if end date or time is changed:
             update the end times of my occurrences
-                        
+
+        Pass 2 is in _sync_occurrences, below.
         """
         
         # TODO: it would be ideal to minimise the consequences of shifting one
-        # occurrence into another - ie to leave most occurrences untouched and 
-        # to create only new ones and unhook ungenerated ones.
+        # occurrence to replace another - ie to leave most occurrences untouched 
+        # and to create only new ones and unhook ungenerated ones.
         # I tried this by using start date (which is unique per generator) as
         # a nominal 'key', but it gets fiddly when you want to vary the end
         # date to before the old start date. For now we'll just update the dates
@@ -174,14 +163,13 @@ class GeneratorModel(models.Model):
 
         saved_self = type(self).objects.get(pk=self.pk)
         
-        start_shift = self.event_start - saved_self.event_start
-        end_shift = self.event_end - saved_self.event_end
-        duration = self.event_duration()
-        
-        if start_shift or end_shift:
+        start_shift = self.start - saved_self.start
+        duration_changed = self._duration != saved_self._duration
+
+        if start_shift or duration_changed:
             for o in self.occurrences.all():
                 o.start += start_shift
-                o.end = o.start + duration
+                o._duration = self._duration
                 o.save()
 
     
@@ -189,9 +177,13 @@ class GeneratorModel(models.Model):
     def _sync_occurrences(self):
     
         """
-            * For candidate occurrences that exist, do nothing.
-            * For candidate occurrences that do not exist, add them.
-            * For existing occurrences that are not candidates, unhook them from the generator
+        Pass 2)
+
+        Generate a list of candidate occurrences.
+        * For candidate occurrences that exist, do nothing.
+        * For candidate occurrences that do not exist, add them.
+        * For existing occurrences that are not candidates, delete them, or unhook them from the
+          generator if they are protected by a Foreign Key.
             
         In detail:
         Get a list, A, of already-generated occurrences.
@@ -209,25 +201,23 @@ class GeneratorModel(models.Model):
         the generator.
         """
         
-        all_occurrences = self.event.occurrences.all() #regardless of generator
-        unaccounted_for = set(self.occurrences.all())
-        
-        event_duration = self.event_duration()
-        
+        all_occurrences = self.event.occurrences_in_listing().all() #regardless of generator
+        existing_but_not_regenerated = set(self.occurrences.all()) #generated by me only
+
         for start in self._generate_dates():
             # if the proposed occurrence exists, then don't make a new one.
             # However, if it belongs to me: 
             #       and if it is marked as an exclusion:
-            #           do nothing (it will later get unhooked)
+            #           do nothing (it will later get deleted/unhooked)
             #       else:
-            #           remove it from the set of unaccounted_for
+            #           remove it from the set of existing_but_not_regenerated
             #           occurrences so it stays hooked up
-            
+
             try:
                 o = all_occurrences.filter(start=start)[0]
                 if o.generated_by == self:
                     if not o.is_exclusion():
-                        unaccounted_for.discard(o)
+                        existing_but_not_regenerated.discard(o)
                 continue
             except IndexError:
                 # no occurrence exists yet.
@@ -239,34 +229,34 @@ class GeneratorModel(models.Model):
             ).count():
                 continue            
 
-            #OK, we're good to go.
-            end = start + event_duration
-            o = self.occurrences.create(event=self.event, start=start, end=end) #implied generated_by = self
+            #OK, we're good to create the occurrence.
+            o = self.occurrences.create(event=self.event, start=start, _duration=self._duration)
+#            print "created %s" % o
+            #implied generated_by = self
     
-        # Finally, unhook any unaccounted_for occurrences
-        for o in unaccounted_for:
-            o.generated_by = None
-            o.save()
-    
-    # This is scrappy
+        # Finally, delete any unaccounted_for occurrences. If we can't delete, due to protection set by FKs to it, then
+        # unhook it instead.
+        for o in existing_but_not_regenerated:
+#            print "deleting %s" % o
+            o.delete()
+
+    def delete(self, *args, **kwargs):
+        """
+        If I am deleted, then cascade to my Occurrences, UNLESS there is is something FKed to them that is protecting them,
+        in which case the FK is set to NULL.
+        """
+        for o in self.occurrences.all():
+            o.delete()
+
+        super(GeneratorModel,self).delete(*args, **kwargs)
+
     def robot_description(self):
-        return u'\n'.join(
-            [pprint_datetime_span(start, end) + repeat_description \
-            for start, end, repeat_description in self.get_spans()])
-    
-    # This is scrappy too
-    def get_spans(self):
-        if self.rule:
-            if self.occurrences.count() > 3:
-                if self.repeat_until:
-                    repeat_description = u', repeating %s until %s' % (
-                        self.rule,
-                        pprint_date_span(self.repeat_until, self.repeat_until)
-                    )
-                else:
-                    repeat_description = u', repeating %s' % self.rule
-                return [(self.event_start, self.event_end, repeat_description),]
-            else:
-                return [(occ.start, occ.end, u'') for occ in self.occurrences.all()]
-        else:
-            return [(self.event_start, self.event_end, u''),]
+        r = "%s, repeating %s" % (
+            pprint_datetime_span(self.start, self.end()),
+            unicode(self.rule).lower(),
+        )
+        
+        if self.repeat_until:
+            r += " until %s" % pprint_date_span(self.repeat_until, self.repeat_until)
+            
+        return r

@@ -4,12 +4,12 @@ from django.db import models
 
 class ExclusionModel(models.Model):
     """
-    Represents a start event which is not to be generated.
+    Represents the time of an occurrence which is not to be generated for a given event.
 
     Implementing subclasses should define an 'event' ForeignKey to an EventModel
     subclass. The related_name for the ForeignKey should be 'exclusions'.
     
-    event = models.Foreignkey(SomeEvent, related_name="exclusions")
+    event = models.ForeignKey(SomeEvent, related_name="exclusions")
     """
     start = models.DateTimeField(db_index=True)
 
@@ -20,9 +20,13 @@ class ExclusionModel(models.Model):
         verbose_name_plural = "repeating occurrence exclusions"
         unique_together = ('event', 'start')
         
+    def __unicode__(self):
+        return "%s starting on %s is excluded" % (self.event, self.start)
+
     def save(self, *args, **kwargs):
         """
-        When an exclusion is saved, any generated occurrences that match should be unhooked.
+        When an exclusion is saved, any generated occurrences that match should
+        be unhooked.
         """
         r = super(ExclusionModel, self).save(*args, **kwargs)
         

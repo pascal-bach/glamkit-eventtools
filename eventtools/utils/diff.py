@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# from django-moderation.
+# pinched from django-moderation.
 # modified to include rather than exclude, fields
 import re
 import difflib

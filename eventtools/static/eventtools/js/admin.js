@@ -19,6 +19,6 @@
 			var id = $this.attr('id');
 			$("fieldset."+id).replaceWith($this);
 		});
-		
+
 	});
 })(jQuery);

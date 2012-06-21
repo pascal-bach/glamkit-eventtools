@@ -6,8 +6,41 @@
       "complex_rule": "", 
       "frequency": "DAILY", 
       "params": "", 
-      "name": "Daily", 
-      "common": false
+      "name": "Every day", 
+      "common": true
+    }
+  }, 
+  {
+    "pk": 7, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "RRULE:FREQ=MONTHLY;BYDAY=%nthday%", 
+      "frequency": "", 
+      "params": "", 
+      "name": "Every month: same calendar position", 
+      "common": true
+    }
+  }, 
+  {
+    "pk": 6, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "FREQ=MONTHLY;BYMONTHDAY=%day%,-1;BYSETPOS=1", 
+      "frequency": "MONTHLY", 
+      "params": "", 
+      "name": "Every month: same date", 
+      "common": true
+    }
+  }, 
+  {
+    "pk": 4, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "", 
+      "frequency": "WEEKLY", 
+      "params": "", 
+      "name": "Every week", 
+      "common": true
     }
   }, 
   {
@@ -17,7 +50,18 @@
       "complex_rule": "RRULE:FREQ=WEEKLY;INTERVAL=2", 
       "frequency": "", 
       "params": "", 
-      "name": "Fortnightly", 
+      "name": "Every fortnight", 
+      "common": false
+    }
+  }, 
+  {
+    "pk": 8, 
+    "model": "eventtools.rule", 
+    "fields": {
+      "complex_rule": "RRULE:FREQ=MONTHLY;BYDAY=%-nthday%", 
+      "frequency": "", 
+      "params": "", 
+      "name": "Every month: same calendar position from end", 
       "common": false
     }
   }, 
@@ -28,7 +72,7 @@
       "complex_rule": "", 
       "frequency": "WEEKLY", 
       "params": "byweekday:0,1,2,3,4", 
-      "name": "Weekdays", 
+      "name": "Every weekday", 
       "common": false
     }
   }, 
@@ -39,18 +83,7 @@
       "complex_rule": "", 
       "frequency": "WEEKLY", 
       "params": "byweekday:5,6", 
-      "name": "Weekends", 
-      "common": false
-    }
-  }, 
-  {
-    "pk": 4, 
-    "model": "eventtools.rule", 
-    "fields": {
-      "complex_rule": "", 
-      "frequency": "WEEKLY", 
-      "params": "", 
-      "name": "Weekly", 
+      "name": "Every weekend day", 
       "common": false
     }
   }

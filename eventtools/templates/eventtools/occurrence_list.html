@@ -14,9 +14,13 @@
 
 {% endcomment %}
 
-	{% regroup occurrence_page by start_date as day_list %}
+	{% if occurrence_page %}
+		{% regroup occurrence_page by start_date as day_list %}
+	{% else %}
+		{% regroup occurrence_pool by start_date as day_list %}	
+	{% endif %}
 	
-	{% nav_calendar selected_start occurrence_qs %}{# shows a global nav calendar where dates in occurrence_page are highligted #}
+	{% nav_calendar day occurrence_qs %}{# shows a global nav calendar where dates in occurrence_qs are highlighted #}
 	
 	<ul class="days">
 		{% for day in day_list %}

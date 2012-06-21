@@ -1,4 +1,13 @@
-<span class="vevent">
-{% if not occurrence.all_day %}<p>{{ occurrence.html_time_description }}</p>{% endif %}
-<h3><a href="{{ occurrence.get_absolute_url }}" class="summary">{{ occurrence.event.title }}</a></h3>
-</span>
+{% with event=occurrence.event %}
+	<span class="vevent">
+		<p>{{ occurrence.html_time_description }}</p>
+		{% if event.status_message %}
+			<p class="status">{{ event.status_message }}</p>
+		{% else %}
+			{% if occurrence.status_message %}
+				<p class="status">{{ occurrence.status_message }}</p>
+			{% endif %}
+		{% endif %}
+		<h3><a href="{{ occurrence.get_absolute_url }}" class="summary">{{ event.title }}</a></h3>
+	</span>
+{% endwith %}
