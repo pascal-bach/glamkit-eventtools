@@ -18,6 +18,10 @@ class GeneratorModel(XTimespanModel):
     Stores information about repeating Occurrences, and generates them,
     unless they already exist, or match an Exception.
     
+    Implementing subclasses should define an 'event' ForeignKey to an
+    EventModel subclass. The related_name for the ForeignKey should be
+    'generators'.
+    
     The public API is quite simple:
     
     save() generates Occurrences.
@@ -32,7 +36,6 @@ class GeneratorModel(XTimespanModel):
     EventModel() returns the Model of the Event that this Generator links to.
     """
 
-    #define a FK called 'event' in the subclass
     rule = models.ForeignKey("eventtools.Rule")
     repeat_until = models.DateField(
         null=True, blank = True,
